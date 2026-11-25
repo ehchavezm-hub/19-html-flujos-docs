@@ -448,7 +448,8 @@ function menu(q){
   }
   nav.innerHTML=html||'<p class="empty">Sin resultados</p>';marcar();
 }
-function marcar(){const id=location.hash.slice(1);nav.querySelectorAll('a').forEach(a=>a.classList.toggle('on',a.dataset.id===id))}
+let ACTUAL=location.hash.slice(1);
+function marcar(){nav.querySelectorAll('a').forEach(a=>a.classList.toggle('on',a.dataset.id===ACTUAL))}
 $('#q').addEventListener('input',ev=>menu(ev.target.value));
 function ficha(m){
   const f=[['Sección',m.seccion],['Revisión',m.revision],['Responsable',m.responsable],['Fecha',m.fecha],['Archivo',m.archivo]];
@@ -525,8 +526,12 @@ function arrastre(el){let d=null;el.addEventListener('pointerdown',ev=>{if(ev.bu
   ['pointerup','pointercancel'].forEach(t=>el.addEventListener(t,()=>{d=null;el.classList.remove('drag')}))}
 function zoomHtml(){let s=1;const zw=$('#zw');const ap=()=>{zw.style.transform='scale('+s+')';zw.style.width=(100/s)+'%';zw.style.height=(100/s)+'%';$('#zl').textContent=Math.round(s*100)+'%'};
   main.querySelectorAll('[data-z]').forEach(b=>b.onclick=()=>{const a=b.dataset.z;s=a==='1'?1:Math.min(3,Math.max(0.3,s*(a==='in'?1.2:1/1.2)));ap()})}
-function ruta(){marcar(); stop(); const id=location.hash.slice(1); if(id&&byId[id]) ver(id); else inicio(); main.scrollTop=0}
-window.addEventListener('hashchange',ruta); window.addEventListener('resize',()=>{if(Z&&PG&&$('#cv'))aplicar()});
+function ruta(){marcar(); stop(); const id=ACTUAL; if(id&&byId[id]) ver(id); else inicio(); main.scrollTop=0}
+// navegación interna: funciona igual abierto desde la carpeta (file://) o desde el generador (blob:, que no admite #)
+function ir(id){ACTUAL=id; if(location.protocol!=='blob:'){try{history.pushState(null,'','#'+id)}catch(e){}} ruta()}
+document.addEventListener('click',ev=>{const a=ev.target.closest('a[href^="#"]'); if(!a)return; ev.preventDefault(); ir(a.getAttribute('href').slice(1))});
+window.addEventListener('popstate',()=>{ACTUAL=location.hash.slice(1); ruta()});
+window.addEventListener('hashchange',()=>{ACTUAL=location.hash.slice(1); ruta()}); window.addEventListener('resize',()=>{if(Z&&PG&&$('#cv'))aplicar()});
 menu(''); ruta();
 })();
 </script>
