@@ -60,11 +60,13 @@ En Windows también: doble clic en `generar_portal.bat` (o arrastrar la carpeta 
 |---|---|
 | `Generador de portal.html` | **Entregable** para usuarios. Se arma con `python construir_generador.py` |
 | `web/generador.js` · `web/generador_base.html` | Código del generador en el navegador (JavaScript) |
+| `web/motor_drawio.js` | Motor de drawio: traducción fiel de `motor_drawio.py` (mismo dibujo: carriles con color, decisiones en ámbar, paso a paso) |
+| `web/office.js` | Word y PowerPoint: tema, estilos, numeración, tablas, páginas, cuadros de texto, formas, imágenes, patrón y diseño |
 | `generar_portal.py` | Versión Python y **plantilla del visor** compartida por ambas versiones |
 | `motor_drawio.py` · `conversores_office.py` | Conversores de la versión Python |
 | `fuentes/` | Figtree (licencia SIL OFL, ver `fuentes/OFL.txt`) |
 
-Después de cambiar `web/` o la plantilla del visor en `generar_portal.py`, vuelve a ejecutar
+Después de cambiar `web/`, `motor_drawio.py` (mantener igual a `web/motor_drawio.js`) o la plantilla del visor en `generar_portal.py`, vuelve a ejecutar
 `python construir_generador.py` y sube el `Generador de portal.html` actualizado.
 
 **Por qué JavaScript para el generador:** los usuarios no tienen Python y la empresa bloquea los `.exe`;

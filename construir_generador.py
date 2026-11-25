@@ -10,7 +10,7 @@ from generar_portal import PLANTILLA  # noqa: E402
 
 ttf = (HERE / 'fuentes' / 'Figtree-VariableFont_wght.ttf').read_bytes()
 base = (HERE / 'web' / 'generador_base.html').read_text(encoding='utf-8')
-js = (HERE / 'web' / 'generador.js').read_text(encoding='utf-8')
+js = '\n'.join((HERE / 'web' / n).read_text(encoding='utf-8') for n in ('motor_drawio.js', 'office.js', 'generador.js'))
 datos = ('const FIGTREE_B64 = "' + base64.b64encode(ttf).decode() + '";\n'
          'const PLANTILLA = ' + json.dumps(PLANTILLA, ensure_ascii=False).replace('</', '<\\/') + ';\n'
          "document.head.insertAdjacentHTML('beforeend', '<style>@font-face{font-family:\\'Figtree\\';font-weight:300 900;"

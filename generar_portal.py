@@ -474,7 +474,7 @@ function ver(id){
   }
   if(m.tipo==='drawio'){
     h+='<div class="bar">'+(m.paginas.length>1?'<span class="grp tabs" role="tablist">'+m.paginas.map((p,k)=>'<button role="tab" data-pg="'+k+'" aria-selected="'+(k===0)+'">'+e(p.nombre)+'</button>').join('')+'</span>':'')
-      +'<span class="grp"><button data-z="fit">Ajustar</button><button data-z="out" aria-label="Alejar">−</button><span id="zl">100%</span><button data-z="in" aria-label="Acercar">+</button><button data-z="1">100%</button></span>'
+      +'<span class="grp"><button data-z="fit" title="Ver el diagrama completo">Ajustar</button><button data-z="ancho" title="Ajustar al ancho">Ancho</button><button data-z="out" aria-label="Alejar">−</button><span id="zl">100%</span><button data-z="in" aria-label="Acercar">+</button><button data-z="1">100%</button></span>'
       +'<span class="grp" id="steps" hidden><button data-s="first" aria-label="Inicio">⏮</button><button data-s="prev" aria-label="Anterior">◀</button><button data-s="play" aria-label="Reproducir">▶</button><button data-s="next" aria-label="Siguiente">▶▶</button><input type="range" id="sr" min="0" value="0" aria-label="Paso"><span id="sl"></span></span>'
       +'<span style="margin-left:auto">Arrastra para moverte · Ctrl + rueda para zoom</span></div>';
     h+='<div class="canvas" id="cv" tabindex="0"><div class="stage" id="st"></div></div>';
@@ -500,7 +500,7 @@ let PG=null, step=0, timer=null;
 function pagina(m,k){
   const st=$('#st'); st.innerHTML=''; st.appendChild(document.getElementById('t-'+m.id+'-'+k).content.cloneNode(true));
   PG=m.paginas[k]; const svg=st.querySelector('svg'); svg.setAttribute('width',PG.w); svg.setAttribute('height',PG.h);
-  Z={s:1}; ajustar();
+  Z={s:1}; ajustarAncho();
   const bp=$('#bPasos'), sp=$('#steps');
   if(bp){bp.setAttribute('aria-pressed','false'); bp.hidden=PG.pasos<2; sp.hidden=true; bp.onclick=()=>{const on=bp.getAttribute('aria-pressed')!=='true';bp.setAttribute('aria-pressed',on);sp.hidden=!on;pasos(on?1:PG.pasos,!on)}}
   const sr=$('#sr'); if(sr){sr.max=PG.pasos; sr.oninput=()=>pasos(+sr.value)}
@@ -516,8 +516,9 @@ function pasos(n,todo){
   const sr=$('#sr'), sl=$('#sl'); if(sr)sr.value=step; if(sl)sl.textContent='Paso '+step+' de '+PG.pasos;
 }
 function aplicar(){const st=$('#st'); if(!st||!Z)return; st.style.transform='scale('+Z.s+')'; st.style.width=(PG.w*Z.s)+'px'; st.style.height=(PG.h*Z.s)+'px'; $('#zl').textContent=Math.round(Z.s*100)+'%'}
+function ajustarAncho(){const cv=$('#cv'); Z.s=Math.min(1.5,Math.max(0.2,(cv.clientWidth-24)/PG.w)); aplicar()}
 function ajustar(){const cv=$('#cv'); Z.s=Math.min(1.5,Math.max(0.1,Math.min((cv.clientWidth-24)/PG.w,(cv.clientHeight-24)/PG.h))); aplicar()}
-function zoomCtl(){main.querySelectorAll('[data-z]').forEach(b=>b.onclick=()=>{const a=b.dataset.z; if(a==='fit')ajustar(); else {Z.s=a==='1'?1:Math.min(4,Math.max(0.1,Z.s*(a==='in'?1.25:0.8)));aplicar()}});
+function zoomCtl(){main.querySelectorAll('[data-z]').forEach(b=>b.onclick=()=>{const a=b.dataset.z; if(a==='fit')ajustar(); else if(a==='ancho')ajustarAncho(); else {Z.s=a==='1'?1:Math.min(4,Math.max(0.1,Z.s*(a==='in'?1.25:0.8)));aplicar()}});
   $('#cv').addEventListener('wheel',ev=>{if(!ev.ctrlKey)return;ev.preventDefault();Z.s=Math.min(4,Math.max(0.1,Z.s*(ev.deltaY<0?1.1:0.9)));aplicar()},{passive:false});
   $('#cv').addEventListener('keydown',ev=>{const cv=$('#cv');if(ev.key==='+'){Z.s*=1.2;aplicar()}if(ev.key==='-'){Z.s/=1.2;aplicar()}if(ev.key==='ArrowRight'&&!$('#steps').hidden){pasos(step+1);ev.preventDefault()}if(ev.key==='ArrowLeft'&&!$('#steps').hidden){pasos(step-1);ev.preventDefault()}});
 }

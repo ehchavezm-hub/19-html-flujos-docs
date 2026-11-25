@@ -82,182 +82,6 @@ function conFigtree(page) {
   return m ? page.slice(0, m.index + m[0].length) + css + page.slice(m.index + m[0].length) : css + page;
 }
 
-// ------------------------------------------------------------------ Word (.docx)
-async function docxAHtml(u8, titulo) {
-  const z = await abrirZip(u8), textos = [];
-  const doc = await z.xml('word/document.xml'), rels = await relaciones(z, 'word/document.xml');
-  const nombres = {}; const st = await z.xml('word/styles.xml');
-  if (st) for (const s of todos(st, 'style')) { const n = hijo(s, 'name'); nombres[at(s, 'w:styleId')] = (n ? at(n, 'w:val') : '').toLowerCase(); }
-  const imagen = async rid => { const t = rels[rid]; if (!t || !z.tiene(t)) return ''; const m = mimeImg(t); if (!m) return ''; return '<img src="data:' + m + ';base64,' + b64(await z.bytes(t)) + '" alt="">'; };
-  const on = el => el && !['0', 'false'].includes(at(el, 'w:val'));
-  async function runs(el) {
-    let out = '';
-    for (const r of todos(el, 'r')) {
-      if (r.parentElement && r.parentElement.localName === 'r') continue;
-      const pr = hijo(r, 'rPr'), s = [];
-      if (pr) {
-        if (on(hijo(pr, 'b'))) s.push('font-weight:700'); if (on(hijo(pr, 'i'))) s.push('font-style:italic');
-        const u = hijo(pr, 'u'); if (u && at(u, 'w:val') !== 'none') s.push('text-decoration:underline');
-        const c = hijo(pr, 'color'); if (c && HEX6.test(at(c, 'w:val') || '')) s.push('color:#' + at(c, 'w:val'));
-        const hl = hijo(pr, 'highlight'); if (hl && at(hl, 'w:val') !== 'none') s.push('background:#fff3a0');
-      }
-      let p = '';
-      for (const ch of r.children) {
-        if (ch.localName === 't') { p += esc(ch.textContent); textos.push(ch.textContent); }
-        else if (ch.localName === 'tab') p += '&emsp;';
-        else if (ch.localName === 'br' || ch.localName === 'cr') p += '<br>';
-        else if (ch.localName === 'drawing' || ch.localName === 'pict' || ch.localName === 'object') {
-          for (const b of todos(ch, 'blip')) p += await imagen(at(b, 'r:embed'));
-          for (const b of todos(ch, 'imagedata')) p += await imagen(at(b, 'r:id'));
-        }
-      }
-      if (p) out += s.length ? '<span style="' + s.join(';') + '">' + p + '</span>' : p;
-    }
-    return out;
-  }
-  async function parrafo(p) {
-    const pr = hijo(p, 'pPr'); let tag = 'p', lista = false; const s = [];
-    if (pr) {
-      const ps = hijo(pr, 'pStyle');
-      if (ps) { const nm = nombres[at(ps, 'w:val')] || (at(ps, 'w:val') || '').toLowerCase(); const m = nm.match(/(?:heading|t[ií]tulo)\s*(\d)/);
-        if (m) tag = 'h' + Math.min(+m[1] + 1, 6); else if (['title', 'título', 'titulo'].includes(nm)) tag = 'h1'; else if (/list|lista/.test(nm)) lista = true; }
-      const jc = hijo(pr, 'jc'); if (jc && ['center', 'right', 'both'].includes(at(jc, 'w:val'))) s.push('text-align:' + (at(jc, 'w:val') === 'both' ? 'justify' : at(jc, 'w:val')));
-      if (hijo(pr, 'numPr')) lista = true;
-      const sh = hijo(pr, 'shd'); if (sh && HEX6.test(at(sh, 'w:fill') || '')) s.push('background:#' + at(sh, 'w:fill'));
-    }
-    let c = await runs(p); if (!c.trim() && tag === 'p') c = '&nbsp;';
-    const a = s.length ? ' style="' + s.join(';') + '"' : '';
-    return lista ? ['li', '<li' + a + '>' + c + '</li>'] : [tag, '<' + tag + a + '>' + c + '</' + tag + '>'];
-  }
-  async function tabla(t) {
-    const grid = [];
-    for (const tr of hijos(t, 'tr')) {
-      const fila = []; let col = 0;
-      for (const tc of hijos(tr, 'tc')) {
-        const pr = hijo(tc, 'tcPr'); let span = 1, vm = null, bg = '';
-        if (pr) { const gs = hijo(pr, 'gridSpan'); if (gs) span = +at(gs, 'w:val') || 1;
-          const v = hijo(pr, 'vMerge'); if (v) vm = at(v, 'w:val') || 'continue';
-          const sh = hijo(pr, 'shd'); if (sh && HEX6.test(at(sh, 'w:fill') || '')) bg = at(sh, 'w:fill'); }
-        fila.push({col, span, vm, bg, html: await cuerpo(tc), rows: 1}); col += span;
-      }
-      grid.push(fila);
-    }
-    grid.forEach((f, i) => f.forEach(c => { if (c.vm === 'restart') { let k = i + 1; while (k < grid.length && grid[k].some(x => x.col === c.col && x.vm === 'continue')) { c.rows++; k++; } } }));
-    let o = '<table>';
-    for (const f of grid) { o += '<tr>'; for (const c of f) { if (c.vm === 'continue') continue;
-      o += '<td' + (c.span > 1 ? ' colspan="' + c.span + '"' : '') + (c.rows > 1 ? ' rowspan="' + c.rows + '"' : '') + (c.bg ? ' style="background:#' + c.bg + '"' : '') + '>' + c.html + '</td>'; } o += '</tr>'; }
-    return o + '</table>';
-  }
-  async function cuerpo(el) {
-    let o = '', li = false;
-    for (const ch of el.children) {
-      if (ch.localName === 'p') { const [t, h] = await parrafo(ch);
-        if (t === 'li' && !li) { o += '<ul>'; li = true; } if (t !== 'li' && li) { o += '</ul>'; li = false; } o += h; }
-      else if (ch.localName === 'tbl') { if (li) { o += '</ul>'; li = false; } o += await tabla(ch); }
-      else if (ch.localName === 'sdt') { const c = hijo(ch, 'sdtContent'); if (c) o += await cuerpo(c); }
-    }
-    return o + (li ? '</ul>' : '');
-  }
-  const body = await cuerpo(uno(doc, 'body'));
-  const page = '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>' + esc(titulo) + '</title><style>' +
-    "body{margin:0;background:#e9ecf2;font-family:Figtree,Calibri,'Segoe UI',system-ui,sans-serif;color:#1f2433;font-size:11pt;line-height:1.45}" +
-    '.hoja{max-width:820px;margin:24px auto;background:#fff;padding:56px 64px;box-shadow:0 1px 4px #0002}' +
-    'h1,h2,h3,h4{color:#1d2a4a;line-height:1.25;margin:1.1em 0 .4em}p{margin:0 0 .5em}' +
-    'table{border-collapse:collapse;width:100%;margin:.6em 0 1em}td{border:1px solid #c9cdd6;padding:4px 7px;vertical-align:top}' +
-    'td p{margin:0}img{max-width:100%;height:auto}ul{margin:0 0 .6em 1.2em;padding:0}</style></head><body><div class="hoja">' + body + '</div></body></html>';
-  return {page, texto: textos.join(' ')};
-}
-
-// ------------------------------------------------------------------ PowerPoint (.pptx)
-function rgb(el) { const c = el && uno(el, 'srgbClr'); return c && HEX6.test(at(c, 'val') || '') ? '#' + at(c, 'val') : null; }
-async function pptxAHtml(u8, titulo) {
-  const z = await abrirZip(u8), textos = [];
-  const pres = await z.xml('ppt/presentation.xml'), prels = await relaciones(z, 'ppt/presentation.xml');
-  const sz = uno(pres, 'sldSz'); const W = sz ? +at(sz, 'cx') : 12192000, H = sz ? +at(sz, 'cy') : 6858000;
-  const orden = todos(pres, 'sldId').map(s => prels[at(s, 'r:id')]).filter(Boolean);
-  function xfrm(el) {
-    let x = null; for (const c of el.children) { if (c.localName === 'spPr' || c.localName === 'grpSpPr') { x = hijo(c, 'xfrm'); break; } if (c.localName === 'xfrm') { x = c; break; } }
-    if (!x) return null; const off = hijo(x, 'off'), ex = hijo(x, 'ext'); if (!off || !ex) return null;
-    const r = [+at(off, 'x'), +at(off, 'y'), +at(ex, 'cx'), +at(ex, 'cy')];
-    const co = hijo(x, 'chOff'), ce = hijo(x, 'chExt'); if (co && ce) r.push(+at(co, 'x'), +at(co, 'y'), +at(ce, 'cx') || 1, +at(ce, 'cy') || 1);
-    return r;
-  }
-  function texto(tx) {
-    let o = '';
-    for (const p of hijos(tx, 'p')) {
-      const pr = hijo(p, 'pPr'); const algn = {ctr: 'center', r: 'right', just: 'justify'}[at(pr, 'algn')] || 'left';
-      const bullet = pr && !hijo(pr, 'buNone') && (at(pr, 'lvl') !== null || hijo(pr, 'buChar'));
-      let c = '';
-      for (const r of p.children) {
-        if (r.localName === 'br') { c += '<br>'; continue; }
-        if (r.localName !== 'r' && r.localName !== 'fld') continue;
-        const t = todos(r, 't').map(x => x.textContent).join(''); if (!t) continue; textos.push(t);
-        const rp = hijo(r, 'rPr'), s = [];
-        if (rp) { if (at(rp, 'b') === '1') s.push('font-weight:700'); if (at(rp, 'i') === '1') s.push('font-style:italic');
-          if (at(rp, 'sz')) s.push('font-size:' + (at(rp, 'sz') / 100 * 1.333).toFixed(1) + 'px');
-          const col = rgb(hijo(rp, 'solidFill')); if (col) s.push('color:' + col); }
-        c += s.length ? '<span style="' + s.join(';') + '">' + esc(t) + '</span>' : esc(t);
-      }
-      o += '<p style="text-align:' + algn + '">' + (bullet && c ? '• ' : '') + (c || '&nbsp;') + '</p>';
-    }
-    return o;
-  }
-  function tabla(t) {
-    let o = '<table>';
-    for (const tr of todos(t, 'tr')) { o += '<tr>';
-      for (const tc of hijos(tr, 'tc')) { if (at(tc, 'hMerge') === '1' || at(tc, 'vMerge') === '1') continue;
-        const bg = rgb(hijo(hijo(tc, 'tcPr'), 'solidFill')); const tx = hijo(tc, 'txBody');
-        o += '<td' + (at(tc, 'gridSpan') ? ' colspan="' + at(tc, 'gridSpan') + '"' : '') + (at(tc, 'rowSpan') ? ' rowspan="' + at(tc, 'rowSpan') + '"' : '') + (bg ? ' style="background:' + bg + '"' : '') + '>' + (tx ? texto(tx) : '') + '</td>'; }
-      o += '</tr>'; }
-    return o + '</table>';
-  }
-  async function formas(arbol, rels, tr, sinPos) {
-    let o = '';
-    for (const el of arbol.children) {
-      const tag = el.localName; if (!['sp', 'pic', 'grpSp', 'graphicFrame', 'cxnSp'].includes(tag)) continue;
-      const xf = xfrm(el); let x, y, w, h;
-      if (xf) [x, y, w, h] = tr(xf[0], xf[1], xf[2], xf[3]); else { x = 0.06 * W; y = sinPos.y; w = 0.88 * W; h = 0.14 * H; sinPos.y += 0.16 * H; }
-      const box = 'left:' + (x / W * 100).toFixed(3) + '%;top:' + (y / H * 100).toFixed(3) + '%;width:' + (w / W * 100).toFixed(3) + '%;height:' + (h / H * 100).toFixed(3) + '%';
-      if (tag === 'grpSp' && xf && xf.length === 8) {
-        const [gx, gy, gw, gh, cx0, cy0, cw, ch] = xf; const [X, Y, WG, HG] = tr(gx, gy, gw, gh);
-        o += await formas(el, rels, (a, b, c, d) => [X + (a - cx0) * WG / cw, Y + (b - cy0) * HG / ch, c * WG / cw, d * HG / ch], sinPos);
-      } else if (tag === 'pic') {
-        const b = uno(el, 'blip'); const t = b && rels[at(b, 'r:embed')]; const m = t && mimeImg(t);
-        o += (t && m && z.tiene(t)) ? '<img class="f" style="' + box + '" src="data:' + m + ';base64,' + b64(await z.bytes(t)) + '" alt="">' : '<div class="f nd" style="' + box + '">imagen</div>';
-      } else if (tag === 'graphicFrame') {
-        const t = uno(el, 'tbl'); if (t) o += '<div class="f" style="' + box + '">' + tabla(t) + '</div>';
-      } else if (tag === 'sp') {
-        const sp = hijo(el, 'spPr'), s = [];
-        if (sp) { const bg = rgb(hijo(sp, 'solidFill')); if (bg) s.push('background:' + bg);
-          const ln = hijo(sp, 'ln'); const lc = rgb(hijo(ln, 'solidFill')); if (lc) s.push('border:1px solid ' + lc);
-          const g = hijo(sp, 'prstGeom'); if (g && at(g, 'prst') === 'ellipse') s.push('border-radius:50%'); if (g && at(g, 'prst') === 'roundRect') s.push('border-radius:8px'); }
-        const tx = hijo(el, 'txBody'); const anc = at(hijo(tx, 'bodyPr'), 'anchor');
-        s.push('justify-content:' + ({ctr: 'center', b: 'flex-end'}[anc] || 'flex-start'));
-        const ph = uno(el, 'ph'); const tit = ph && ['title', 'ctrTitle'].includes(at(ph, 'type'));
-        o += '<div class="f t' + (tit ? ' tit' : '') + '" style="' + box + ';' + s.join(';') + '">' + (tx ? texto(tx) : '') + '</div>';
-      }
-    }
-    return o;
-  }
-  let slides = '';
-  for (let k = 0; k < orden.length; k++) {
-    const sx = await z.xml(orden[k]); if (!sx) continue; const rels = await relaciones(z, orden[k]);
-    const tree = uno(sx, 'spTree'); const bgEl = uno(sx, 'bg'); const bg = bgEl ? rgb(uno(bgEl, 'solidFill')) : null;
-    const c = tree ? await formas(tree, rels, (a, b, c2, d) => [a, b, c2, d], {y: 0.05 * H}) : '';
-    slides += '<section class="s" style="aspect-ratio:' + W + '/' + H + ';' + (bg ? 'background:' + bg : '') + '"><span class="n">' + (k + 1) + '</span>' + c + '</section>';
-  }
-  const page = '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>' + esc(titulo) + '</title><style>' +
-    "body{margin:0;background:#3a3f4b;font-family:Figtree,Calibri,'Segoe UI',system-ui,sans-serif;color:#1f2433;padding:20px}" +
-    '.s{position:relative;max-width:1100px;margin:0 auto 22px;background:#fff;box-shadow:0 2px 10px #0006;overflow:hidden;container-type:inline-size}' +
-    '.n{position:absolute;right:10px;bottom:6px;font-size:11px;color:#8a90a0;z-index:5}' +
-    '.f{position:absolute;box-sizing:border-box;overflow:hidden}.f.t{display:flex;flex-direction:column;padding:.4cqw .8cqw;font-size:1.5cqw;line-height:1.2}' +
-    '.f.t p{margin:0 0 .3em}.f.tit{font-size:2.8cqw;font-weight:700;color:#1d2a4a}img.f{object-fit:contain}' +
-    '.nd{border:1px dashed #9aa1ae;color:#9aa1ae;display:flex;align-items:center;justify-content:center;font-size:1cqw}' +
-    'table{border-collapse:collapse;width:100%;font-size:1.2cqw}td{border:1px solid #c9cdd6;padding:.3cqw .5cqw;vertical-align:top}td p{margin:0}' +
-    '</style></head><body>' + slides + '</body></html>';
-  return {page, texto: textos.join(' ')};
-}
-
 // ------------------------------------------------------------------ Excel (.xlsx)
 const FMT_FECHA = new Set([14, 15, 16, 17, 18, 19, 20, 21, 22, 45, 46, 47]);
 const FMT_STD = {1: '0', 2: '0.00', 3: '#,##0', 4: '#,##0.00', 9: '0%', 10: '0.00%', 11: '0.00E+00', 49: '@'};
@@ -703,7 +527,7 @@ async function construir(entradas, nombreCarpeta, opciones) {
         const u8 = new Uint8Array(await e.file.arrayBuffer());
         if (tipo === 'drawio') {
           const pags = paginasDrawio(dec.decode(u8)); m.paginas = []; const tx = [];
-          for (let k = 0; k < pags.length; k++) { try { const R = drawioSvg(await modeloDe(pags[k][1]), id + 'p' + k, pags[k][0]);
+          for (let k = 0; k < pags.length; k++) { try { const R = MD.render(await modeloDe(pags[k][1]), id + 'p' + k, pags[k][0]);
               m.paginas.push({nombre: pags[k][0], w: R.w, h: R.h, pasos: R.pasos}); payload.push('<template id="t-' + id + '-' + m.paginas.length + '">' + R.svg + '</template>'); tx.push(pags[k][0], R.texto);
               if (R.svg.includes('IMAGEN NO DISPONIBLE')) aviso(e.ruta + ' · «' + pags[k][0] + '»: hay imágenes enlazadas que no se pudieron incrustar.'); }
             catch (er) { aviso(e.ruta + ' · página «' + pags[k][0] + '»: no se pudo dibujar (' + er.message + ')'); } }
@@ -716,7 +540,8 @@ async function construir(entradas, nombreCarpeta, opciones) {
           const R = await htmlConRecursos(t, e.ruta, todosArch); m.texto = R.texto; payload.push('<script type="text/plain" id="o-' + id + '">' + b64txt(R.page) + '<\/script>'); }
         else {
           const x = ext(e.ruta); let R = null;
-          if (x === '.docx') R = await docxAHtml(u8, d.titulo); else if (x === '.pptx') R = await pptxAHtml(u8, d.titulo); else if (x === '.xlsx' || x === '.xlsm') R = await xlsxAHtml(u8, d.titulo);
+          if (x === '.docx') R = await OX.docxAHtml(u8, d.titulo); else if (x === '.pptx') R = await OX.pptxAHtml(u8, d.titulo);
+          if (R && R.avisos && R.avisos.emf) aviso(e.ruta + ': ' + R.avisos.emf + ' imagen(es) en formato EMF/WMF que el navegador no puede mostrar (se ven como recuadro gris).'); else if (x === '.xlsx' || x === '.xlsm') R = await xlsxAHtml(u8, d.titulo);
           payload.push('<script type="text/plain" id="o-' + id + '">' + b64(u8) + '<\/script>');
           if (R) { m.vista = 'html'; m.texto = R.texto.slice(0, 60000); if (!m.nota) m.nota = NOTA[tipo]; payload.push('<script type="text/plain" id="v-' + id + '">' + b64txt(conFigtree(R.page)) + '<\/script>'); }
           else { m.vista = 'none'; aviso(e.ruta + ': los formatos antiguos (.doc, .xls, .ppt) no se pueden ver en el navegador; queda para descargar. Guárdalo como .docx/.xlsx/.pptx para verlo.'); }
@@ -794,4 +619,4 @@ window.addEventListener('DOMContentLoaded', () => {
     NOMBRE = (fs[0].webkitRelativePath || fs[0].name).split('/')[0];
     ENTRADAS = fs.map(f => ({ruta: (f.webkitRelativePath || f.name).split('/').slice(1).join('/') || f.name, file: f})); $('#log').innerHTML = ''; listo(); };
 });
-window.__portal = {construir, drawioSvg, docxAHtml, xlsxAHtml, pptxAHtml, leerXlsx, abrirZip};
+window.__portal = {construir, MD, OX, modeloDe, paginasDrawio, drawioSvg, xlsxAHtml, leerXlsx, abrirZip};
