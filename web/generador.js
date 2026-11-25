@@ -627,7 +627,9 @@ async function construir(entradas, nombreCarpeta, opciones) {
           const x = ext(e.ruta); let R = null;
           if (x === '.docx') R = await OX.docxAHtml(u8, d.titulo); else if (x === '.pptx') R = await OX.pptxAHtml(u8, d.titulo);
           if (R && R.avisos && R.avisos.emf) aviso(e.ruta + ': ' + R.avisos.emf + ' imagen(es) en formato EMF/WMF que el navegador no puede mostrar (se ven como recuadro gris).'); else if (x === '.xlsx' || x === '.xlsm') R = await xlsxAHtml(u8, d.titulo);
-          payload.push('<script type="text/plain" id="o-' + id + '">' + b64(u8) + '<\/script>');
+          // el original de Word/Excel/PowerPoint no se copia dentro del portal (lo haría muy pesado): «Descargar original»
+          // abre el archivo de la misma carpeta. Solo se incrusta si se marca la opción, o si no hay vista.
+          if (opciones.originales || !R) payload.push('<script type="text/plain" id="o-' + id + '">' + b64(u8) + '<\/script>');
           if (R) { m.vista = 'html'; m.texto = R.texto.slice(0, 60000); if (!m.nota) m.nota = NOTA[tipo]; payload.push('<script type="text/plain" id="v-' + id + '">' + b64txt(conFigtree(R.page)) + '<\/script>'); }
           else { m.vista = 'none'; aviso(e.ruta + ': los formatos antiguos (.doc, .xls, .ppt) no se pueden ver en el navegador; queda para descargar. Guárdalo como .docx/.xlsx/.pptx para verlo.'); }
         }
@@ -681,7 +683,7 @@ async function guardar(nombre, contenido, tipo) {
 async function generar() {
   $('#bGenerar').disabled = true; $('#bElegir').disabled = true; $('#fin').hidden = true; $('#log').innerHTML = ''; const t0 = performance.now();
   try {
-    const {html, meta} = await construir(ENTRADAS, NOMBRE, {titulo: $('#titulo').value.trim()});
+    const {html, meta} = await construir(ENTRADAS, NOMBRE, {titulo: $('#titulo').value.trim(), originales: $('#originales').checked});
     const nombre = NOMBRE + ' - Portal.html'; const donde = await guardar(nombre, html, 'text/html');
     const mb = new Blob([html]).size / 1e6; const disp = meta.filter(m => !['pendiente', 'error'].includes(m.tipo)).length;
     $('#estado').textContent = 'Listo en ' + ((performance.now() - t0) / 1000).toFixed(1) + ' s';

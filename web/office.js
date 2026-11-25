@@ -186,6 +186,20 @@ const OX = (() => {
   }
 
   // ------------------------------------------------------------------ imágenes de un paquete
+  // Fotos grandes: se reducen a 1600 px de lado mayor y se guardan en WebP (Edge/Chrome lo muestran; conserva transparencia).
+  // Así el portal no carga las imágenes a resolución de cámara. Si el resultado no es menor, se deja la original.
+  const LADO_MAX = 1600, UMBRAL = 120 * 1024;
+  async function reducirImagen(b, m) {
+    if (b.length < UMBRAL || !/^image\/(jpeg|png|bmp|gif)$/.test(m) || typeof createImageBitmap !== 'function' || typeof OffscreenCanvas !== 'function') return null;
+    if (m === 'image/gif' && b.length < 2e6) return null;            // los GIF pueden estar animados
+    try {
+      const bmp = await createImageBitmap(new Blob([b], {type: m})); const k = Math.min(1, LADO_MAX / Math.max(bmp.width, bmp.height));
+      const w = Math.max(1, Math.round(bmp.width * k)), h = Math.max(1, Math.round(bmp.height * k));
+      const cv = new OffscreenCanvas(w, h); const g = cv.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(bmp, 0, 0, w, h); bmp.close && bmp.close();
+      const out = await cv.convertToBlob({type: 'image/webp', quality: 0.82}); if (!out || out.type !== 'image/webp' || out.size >= b.length * 0.9) return null;
+      return {b: new Uint8Array(await out.arrayBuffer()), m: 'image/webp'};
+    } catch (e) { return null; }
+  }
   function lectorImagenes(z, avisos) {
     const cache = new Map();
     return async (rels, blipFill, dims) => {
@@ -195,7 +209,8 @@ const OX = (() => {
       const t = rels[rid]; if (!t) return null;
       if (cache.has(t)) return cache.get(t);
       let u = null; const m = mimeDe(t);
-      if (m && z.tiene(t)) { const b = await z.bytes(t); let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); u = 'data:' + m + ';base64,' + btoa(s); }
+      if (m && z.tiene(t)) { let b = await z.bytes(t); let mm = m; const r = await reducirImagen(b, m); if (r) { b = r.b; mm = r.m; }
+        let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); u = 'data:' + mm + ';base64,' + btoa(s); }
       else if (/\.(emf|wmf|tif|tiff)$/i.test(t)) avisos.emf = (avisos.emf || 0) + 1;
       cache.set(t, u); return u;
     };
@@ -540,7 +555,7 @@ const OX = (() => {
       const tb = desc1(el, 'txbxContent');
       if (tb) { const bp = kid(el, 'bodyPr'); const ins = [A(bp, 'tIns') ?? 45720, A(bp, 'rIns') ?? 91440, A(bp, 'bIns') ?? 45720, A(bp, 'lIns') ?? 91440].map(v => f2(EPX(num(v))) + 'px').join(' ');
         const anc = A(bp, 'anchor'); const cuerpo = await bloques(tb, Object.assign({}, ctx, {enCaja: true}));
-        o += '<div class="tb" style="padding:' + ins + ';justify-content:' + ({ctr: 'center', b: 'flex-end'}[anc] || 'flex-start') + '">' + cuerpo + '</div>'; }
+        o += '<div class="tb' + (desc1(bp, 'spAutoFit') || kid(bp, 'spAutoFit') ? ' crece' : '') + '" style="padding:' + ins + ';justify-content:' + ({ctr: 'center', b: 'flex-end'}[anc] || 'flex-start') + '">' + cuerpo + '</div>'; }
       return o;
     }
     async function grupo(gEl, W0, H0, ctx) {          // wpg:wgp / wpc: hijos en coordenadas del grupo
@@ -575,25 +590,35 @@ const OX = (() => {
     }
     async function dibujo(dr, ctx) {
       const inl = kid(dr, 'inline'), anc = kid(dr, 'anchor'); const el = inl || anc; if (!el) return '';
-      const ex = kid(el, 'extent'); const w = num(A(ex, 'cx')), h = num(A(ex, 'cy'));
+      const ex = kid(el, 'extent'); let w = num(A(ex, 'cx')), h = num(A(ex, 'cy')); const sec = ctx.sec;
+      if (anc && sec) {                                // wp14:sizeRelH / sizeRelV: ancho o alto en % de la página o del margen
+        const refAn = r => ({page: sec.w, leftMargin: sec.mL, rightMargin: sec.mR, insideMargin: sec.mL, outsideMargin: sec.mR}[r] ?? (sec.w - sec.mL - sec.mR));
+        const refAl = r => ({page: sec.h, topMargin: sec.mT, bottomMargin: sec.mB, insideMargin: sec.mT, outsideMargin: sec.mB}[r] ?? (sec.h - sec.mT - sec.mB));
+        const sh = kid(anc, 'sizeRelH'), sv = kid(anc, 'sizeRelV'); const pw = num(sh && kid(sh, 'pctWidth') && kid(sh, 'pctWidth').textContent), pv_ = num(sv && kid(sv, 'pctHeight') && kid(sv, 'pctHeight').textContent);
+        if (pw > 0) w = refAn(A(sh, 'relativeFrom')) * pw / 100000 * 9525;
+        if (pv_ > 0) h = refAl(A(sv, 'relativeFrom')) * pv_ / 100000 * 9525;
+      }
       const gd = desc1(el, 'graphicData'); const inner = await contenidoGrafico(gd, w, h, ctx);
+      const crece = !!(desc1(gd, 'spAutoFit') && desc1(gd, 'txbxContent') && !desc1(gd, 'wgp'));   // «ajustar tamaño de la forma al texto»
+      const alto = hp => (crece ? 'min-height:' : 'height:') + f2(hp) + 'px';
       if (inl) return '<span class="il" style="width:' + f2(EPX(w)) + 'px;height:' + f2(EPX(h)) + 'px">' + inner + '</span>';
       // anclado
-      const ph = kid(anc, 'positionH'), pv = kid(anc, 'positionV'); const sec = ctx.sec;
+      const ph = kid(anc, 'positionH'), pv = kid(anc, 'positionV');
       const rh = A(ph, 'relativeFrom') || 'column', rv = A(pv, 'relativeFrom') || 'paragraph';
       const oh = kid(ph, 'posOffset'), ah = kid(ph, 'align'), ov = kid(pv, 'posOffset'), av = kid(pv, 'align');
       const pagW = sec.w, pagH = sec.h, mL = sec.mL, mT = sec.mT, cW = sec.w - sec.mL - sec.mR, cH = sec.h - sec.mT - sec.mB;
       const wpx = EPX(w), hpx = EPX(h);
       const refH = rh === 'page' ? [0, pagW] : ['margin', 'column', 'character', 'insideMargin'].includes(rh) ? [mL, cW] : rh === 'leftMargin' ? [0, mL] : rh === 'rightMargin' ? [pagW - sec.mR, sec.mR] : [mL, cW];
-      let x = oh ? refH[0] + EPX(num(oh.textContent)) : refH[0] + ({center: (refH[1] - wpx) / 2, right: refH[1] - wpx, inside: 0, outside: refH[1] - wpx}[ah ? ah.textContent : 'left'] || 0);
+      const ph100 = kid(ph, 'pctPosHOffset'), pv100 = kid(pv, 'pctPosVOffset');
+      let x = ph100 ? refH[0] + refH[1] * num(ph100.textContent) / 100000 : oh ? refH[0] + EPX(num(oh.textContent)) : refH[0] + ({center: (refH[1] - wpx) / 2, right: refH[1] - wpx, inside: 0, outside: refH[1] - wpx}[ah ? ah.textContent : 'left'] || 0);
       const enPagina = ['page', 'margin', 'topMargin', 'bottomMargin'].includes(rv) && !ctx.enCaja;
       const refV = rv === 'page' ? [0, pagH] : rv === 'margin' ? [mT, cH] : rv === 'topMargin' ? [0, mT] : rv === 'bottomMargin' ? [pagH - sec.mB, sec.mB] : [0, 0];
-      let y = ov ? refV[0] + EPX(num(ov.textContent)) : refV[0] + ({center: (refV[1] - hpx) / 2, bottom: refV[1] - hpx}[av ? av.textContent : 'top'] || 0);
+      let y = pv100 ? refV[0] + refV[1] * num(pv100.textContent) / 100000 : ov ? refV[0] + EPX(num(ov.textContent)) : refV[0] + ({center: (refV[1] - hpx) / 2, bottom: refV[1] - hpx}[av ? av.textContent : 'top'] || 0);
       const detras = A(anc, 'behindDoc') === '1'; const z_ = detras ? 0 : 3;
-      const html_ = '<div class="ab" style="left:' + f2(x) + 'px;top:' + f2(y) + 'px;width:' + f2(wpx) + 'px;height:' + f2(hpx) + 'px;z-index:' + z_ + '">' + inner + '</div>';
+      const html_ = '<div class="ab" style="left:' + f2(x) + 'px;top:' + f2(y) + 'px;width:' + f2(wpx) + 'px;' + alto(hpx) + ';z-index:' + z_ + '">' + inner + '</div>';
       if (enPagina) { ctx.flotantes.push(html_); return '\u0002F' + (ctx.flotantes.length - 1) + '\u0002'; }
       // relativo al párrafo/línea: posición dentro del párrafo (que es relativo), x medido desde el margen izquierdo
-      return '<span class="ab" style="left:' + f2(x - mL - (ctx.indent || 0)) + 'px;top:' + f2(y) + 'px;width:' + f2(wpx) + 'px;height:' + f2(hpx) + 'px;z-index:' + z_ + '">' + inner + '</span>';
+      return '<span class="ab" style="left:' + f2(x - mL - (ctx.indent || 0)) + 'px;top:' + f2(y) + 'px;width:' + f2(wpx) + 'px;' + alto(hpx) + ';z-index:' + z_ + '">' + inner + '</span>';
     }
     // ---------- párrafos (con cortes de página)
     const PAG = '\u0000PAGINA\u0000';
@@ -765,7 +790,7 @@ const OX = (() => {
       '.cuerpo{position:relative;z-index:1}.hd,.ft{position:absolute;z-index:1;color:#000}' +
       '.p{margin:0;position:relative;overflow-wrap:break-word}.num{display:inline-block;text-indent:0;padding-right:4px}' +
       '.tab{display:inline-block;width:48px}.ab{position:absolute;box-sizing:border-box}.il{display:inline-block;position:relative;vertical-align:bottom}' +
-      '.geo{position:absolute;inset:0;width:100%;height:100%}.tb{position:absolute;inset:0;display:flex;flex-direction:column;box-sizing:border-box;overflow:visible}' +
+      '.geo{position:absolute;inset:0;width:100%;height:100%}.tb{position:absolute;inset:0;display:flex;flex-direction:column;box-sizing:border-box;overflow:visible}.tb.crece{position:relative;inset:auto;min-height:100%}' +
       '.vml{display:block;border:1px dashed #ccd;padding:4px;margin:4px 0}' +
       '.nd{position:absolute;inset:0;background:#eef0f4;border:1px dashed #b8bfcc;color:#7a8396;display:flex;align-items:center;justify-content:center;font:12px Figtree,sans-serif}' +
       'table.t{border-collapse:collapse;table-layout:fixed}table.t td{overflow-wrap:break-word}img{max-width:none}' +

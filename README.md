@@ -29,7 +29,7 @@ Si la carpeta está en Google Drive, usa la carpeta sincronizada en la PC (Googl
 | PowerPoint `.pptx` | Diapositivas con textos, imágenes y tablas en su posición |
 | `.doc` / `.xls` / `.ppt` antiguos | Solo para descargar (guárdalos como `.docx` / `.xlsx` / `.pptx` para verlos) |
 
-Todos los documentos tienen **Descargar original** y **Pantalla completa**; el **buscador** encuentra títulos,
+Todos los documentos tienen **Descargar original** y **Pantalla completa**. Para que el portal sea liviano, los Word, Excel y PowerPoint no se copian dentro: «Descargar original» abre el archivo de la carpeta (el portal debe quedar junto a los documentos). Si vas a enviar el portal solo, marca «Incluir una copia de los originales». Las fotos grandes se reducen a 1600 px; el **buscador** encuentra títulos,
 datos de la ficha y el texto de los documentos (excepto dentro de los PDF).
 
 ### Configuración del portal (`Configuracion html … .xlsx`)

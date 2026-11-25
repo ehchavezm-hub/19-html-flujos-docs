@@ -462,7 +462,11 @@ const blobs={};
 function bytes(id){const b=atob(document.getElementById(id).textContent.trim());const u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u}
 function blobUrl(id,mime){return blobs[id]||(blobs[id]=URL.createObjectURL(new Blob([bytes(id)],{type:mime})))}
 function vista(m){return document.getElementById('v-'+m.id)?'v-'+m.id:'o-'+m.id}
-function descargar(m){const a=document.createElement('a');a.href=blobUrl('o-'+m.id,m.mime);a.download=m.nombre;document.body.appendChild(a);a.click();a.remove()}
+function descargar(m){const a=document.createElement('a');
+  if(document.getElementById('o-'+m.id)){a.href=blobUrl('o-'+m.id,m.mime);a.download=m.nombre}
+  else{if(location.protocol==='blob:'){alert('Para descargar el original, abre el portal desde su carpeta (doble clic en el archivo del portal). Esta vista previa del generador no tiene acceso a la carpeta.');return}
+    a.href=m.archivo.split('/').map(encodeURIComponent).join('/');a.target='_blank';a.rel='noopener'}
+  document.body.appendChild(a);a.click();a.remove()}
 function menu(q){
   const nq=norm(q.trim()); const grupos=new Map();
   for(const m of META){
