@@ -3,55 +3,87 @@
 <title>Generador de portal de documentos</title>
 <style>
 /*__FONTFACE__*/
-:root{--navy:#1d2a4a;--ink:#1f2433;--mut:#566079;--line:#dde2ea;--bg:#f4f6fa;--acc:#2e5aa8;--ok:#2f7d32;--warn:#b45309}
+/* Generador · mismo lenguaje que el portal: hoja de plano, hormigón, grafito y naranja de seguridad. */
+:root{--tinta:#1d2327;--tinta2:#39424a;--mut:#5a646b;--linea:#c3cacd;--linea2:#e1e5e6;--fondo:#eef0f0;--papel:#fff;--horm:#e3e6e6;
+--acc:#c2470a;--acc-osc:#a33b07;--acc-suave:#fbe8dc;--ok:#2d6a3e;--ok-suave:#e6f2ea;--warn:#8a5a0b;--r:6px}
 *{box-sizing:border-box}[hidden]{display:none!important}
-body{margin:0;font-family:Figtree,'Segoe UI',system-ui,sans-serif;color:var(--ink);background:var(--bg)}
-header{background:var(--navy);color:#fff;padding:22px 28px}header h1{margin:0;font-size:22px}header p{margin:4px 0 0;color:#c6d0e6;font-size:14px}
-main{max-width:880px;margin:24px auto;padding:0 20px;display:grid;gap:16px}
-.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px 20px}
-.card h2{margin:0 0 6px;font-size:16px;display:flex;gap:10px;align-items:center}.num{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--acc);color:#fff;font-size:13px}
-.card p{margin:4px 0 12px;color:var(--mut);font-size:14px;line-height:1.45}
-button{font:inherit;font-size:15px;font-weight:600;padding:11px 18px;border-radius:9px;border:1px solid var(--acc);background:var(--acc);color:#fff;cursor:pointer}
-button.sec{background:#fff;color:var(--acc)}button:disabled{opacity:.45;cursor:not-allowed}
+body{margin:0;font-family:Figtree,'Segoe UI',system-ui,sans-serif;color:var(--tinta);background:var(--fondo);-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;line-height:1.45}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.hoja{max-width:860px;margin:32px auto 48px;padding:0 20px}
+/* cabecera como rótulo de plano */
+.cab{display:grid;grid-template-columns:1fr auto;border:1.5px solid var(--tinta);background:var(--papel);border-radius:2px}
+.cab .t{padding:16px 20px 15px}.cab h1{margin:0;font-size:26px;font-weight:780;letter-spacing:-.025em;line-height:1.12}
+.cab p{margin:6px 0 0;color:var(--tinta2);font-size:14.5px;max-width:58ch;text-wrap:pretty}
+.cab .d{border-left:1px solid var(--linea);display:grid;align-content:stretch;min-width:190px}
+.cab .d div{padding:8px 14px;border-bottom:1px solid var(--linea2)}.cab .d div:last-child{border-bottom:0}
+.cab small{display:block;font-size:11px;color:var(--mut)}.cab b{font-size:13px;font-weight:650}
+/* pasos: una secuencia real (1 elegir, 2 generar, 3 abrir) */
+.paso{display:grid;grid-template-columns:52px 1fr;margin-top:14px;background:var(--papel);border:1px solid var(--linea);border-radius:2px}
+.paso>.num{display:grid;place-items:start center;padding-top:16px;font-size:20px;font-weight:780;color:var(--tinta);border-right:1px solid var(--linea2);font-variant-numeric:tabular-nums}
+.paso>.c{padding:15px 20px 18px;min-width:0}
+.paso h2{margin:0 0 4px;font-size:17px;font-weight:720;letter-spacing:-.01em}
+.paso p{margin:0 0 14px;color:var(--tinta2);font-size:14px;max-width:66ch;text-wrap:pretty}
+.paso.listo>.num{color:#fff;background:var(--ok);border-color:var(--ok)}
+.paso.fin{border-color:var(--ok)}.paso.fin h2{color:var(--ok)}
+button{font:inherit;font-size:14.5px;font-weight:650;min-height:42px;padding:9px 18px;border-radius:var(--r);border:1px solid var(--acc);background:var(--acc);color:#fff;cursor:pointer;touch-action:manipulation;transition:background-color .12s,border-color .12s,transform .08s}
+button:hover{background:var(--acc-osc);border-color:var(--acc-osc)}button:active{transform:translateY(1px)}
+button.sec{background:var(--papel);color:var(--tinta);border-color:var(--linea)}button.sec:hover{border-color:var(--tinta2);background:#f7f8f8}
+button:disabled{opacity:.45;cursor:not-allowed;transform:none}
 .fila{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-input[type=text]{font:inherit;font-size:15px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;min-width:320px;flex:1}
-.carpeta{font-weight:700;color:var(--navy)}.mut{color:var(--mut);font-size:13px}
-.prog{height:8px;background:#e7ebf2;border-radius:6px;overflow:hidden;margin:10px 0 6px}.prog span{display:block;height:100%;width:0;background:var(--acc);transition:width .2s}
-#log{max-height:240px;overflow:auto;font-size:12.5px;background:#fbfcfe;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--mut)}
-#log .av,.av{color:var(--warn)}
-.fin{border-color:#b7dfbb;background:#f3fbf4}.fin h2{color:var(--ok)}
-.aviso{background:#fff7e0;border:1px solid #f0d98a;border-radius:10px;padding:10px 14px;font-size:13.5px}
-details{font-size:14px;color:var(--mut)}details summary{cursor:pointer;color:var(--ink);font-weight:600}
-table.f{border-collapse:collapse;font-size:13px;margin-top:8px}table.f td{border:1px solid var(--line);padding:5px 8px}
+label.campo{display:block;font-size:12.5px;font-weight:600;color:var(--tinta2);margin:0 0 5px}
+input[type=text]{font:inherit;font-size:15px;min-height:42px;padding:9px 12px;border:1px solid var(--linea);border-radius:var(--r);min-width:0;flex:1 1 300px;background:var(--papel);color:var(--tinta)}
+input[type=text]:hover{border-color:#9aa4a9}input[type=text]:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-suave)}
+.carpeta{font-weight:700;color:var(--tinta)}.mut{color:var(--mut);font-size:13px}
+.opcion{display:flex;gap:10px;align-items:flex-start;margin:14px 0 4px;padding:10px 12px;border:1px solid var(--linea2);border-radius:var(--r);font-size:13px;color:var(--tinta2);cursor:pointer}
+.opcion input{margin:2px 0 0;width:16px;height:16px;accent-color:var(--acc);flex:none}
+.prog{height:6px;background:var(--linea2);border-radius:3px;overflow:hidden;margin:16px 0 6px}.prog span{display:block;height:100%;width:0;background:var(--acc);transition:width .2s}
+#estado{font-size:13px;color:var(--tinta2);min-height:1.4em;font-variant-numeric:tabular-nums}
+details{margin-top:14px;font-size:13.5px;color:var(--tinta2);border-top:1px solid var(--linea2);padding-top:12px}
+details summary{cursor:pointer;color:var(--tinta);font-weight:650}details p{margin:8px 0 10px}
+table.f{border-collapse:collapse;font-size:12px;margin-top:10px;display:block;overflow-x:auto}table.f td{border:1px solid var(--linea);padding:5px 8px;white-space:nowrap}
+.registro{margin-top:14px;background:var(--papel);border:1px solid var(--linea);border-radius:2px}
+.registro h2{margin:0;padding:10px 16px;font-size:13px;font-weight:700;border-bottom:1px solid var(--linea2)}
+#log{max-height:240px;overflow:auto;font-size:12.5px;padding:8px 16px 10px;color:var(--mut);overscroll-behavior:contain}
+#log div{padding:1px 0}#log .av,.av{color:var(--warn);font-weight:500}
+.aviso{background:var(--acc-suave);border-left:3px solid var(--acc);padding:10px 14px;font-size:13.5px;margin-bottom:14px}
+.pie{margin-top:14px;font-size:12.5px;color:var(--mut);max-width:72ch}
+@media (max-width:640px){.hoja{margin-top:16px}.cab{grid-template-columns:1fr}.cab .d{border-left:0;border-top:1px solid var(--linea);grid-template-columns:1fr 1fr}.paso{grid-template-columns:40px 1fr}.paso>.c{padding:13px 14px 16px}button{width:100%}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style></head>
 <body>
-<header><h1>Generador de portal de documentos</h1>
-<p>Convierte todos los archivos de una carpeta en un solo HTML que funciona sin internet. No instala nada: todo ocurre en este navegador.</p></header>
-<main>
+<main class="hoja">
   <div class="aviso" id="compat" hidden>Este navegador es muy antiguo para el generador. Abre este archivo con Microsoft Edge o Google Chrome actualizados.</div>
-  <section class="card"><h2><span class="num">1</span>Elige la carpeta</h2>
-    <p>Cada subcarpeta será una sección del menú. Se leen .drawio, PDF, HTML, Word (.docx), Excel (.xlsx) y PowerPoint (.pptx). El navegador te pedirá permiso para leer y guardar en esa carpeta.</p>
+  <header class="cab"><div class="t"><h1>Generador de portal</h1>
+    <p>Convierte los documentos de una carpeta en un solo archivo HTML para consultarlos sin internet. Todo ocurre en este navegador: no se instala nada.</p></div>
+    <div class="d"><div><small>Lee</small><b>drawio, PDF, Word, Excel, PowerPoint, HTML</b></div><div><small>Guarda</small><b>en la misma carpeta</b></div></div></header>
+
+  <section class="paso" id="paso1"><div class="num" aria-hidden="true">1</div><div class="c"><h2>Elige la carpeta</h2>
+    <p>Cada subcarpeta será una sección del menú. Si la carpeta tiene un Excel «Configuracion html», el portal se ordena según ese archivo. El navegador te pedirá permiso para leer y guardar en la carpeta.</p>
     <div class="fila"><button type="button" id="bElegir">Elegir carpeta…</button><span class="mut" id="nota"></span></div>
-    <input type="file" id="entrada" webkitdirectory multiple hidden>
+    <input type="file" id="entrada" webkitdirectory multiple hidden></div>
   </section>
-  <section class="card" id="paso2" hidden><h2><span class="num">2</span>Genera el portal</h2>
-    <p>Carpeta: <span class="carpeta" id="carpeta"></span> · <span id="resumen"></span></p>
-    <div class="fila"><input type="text" id="titulo" placeholder="Título del portal" aria-label="Título del portal">
+
+  <section class="paso" id="paso2" hidden><div class="num" aria-hidden="true">2</div><div class="c"><h2>Genera el portal</h2>
+    <p>Carpeta <span class="carpeta" id="carpeta"></span>: <span id="resumen"></span></p>
+    <label class="campo" for="titulo">Título del portal</label>
+    <div class="fila"><input type="text" id="titulo" name="titulo" placeholder="Por ejemplo: Guía de Oficina Técnica…" autocomplete="off">
       <button type="button" id="bGenerar">Generar portal</button></div>
-    <label class="mut" style="display:flex;gap:8px;align-items:flex-start;margin:4px 0 10px"><input type="checkbox" id="originales" style="margin-top:3px">
-      <span>Incluir una copia de los PDF, Word, Excel y PowerPoint originales dentro del portal. Solo si vas a enviar el portal sin la carpeta: lo hace mucho más pesado. Sin marcar, «Descargar original» abre el archivo de la carpeta.</span></label>
+    <label class="opcion"><input type="checkbox" id="originales">
+      <span>Incluir una copia de los PDF, Word, Excel y PowerPoint originales dentro del portal. Márcalo solo si enviarás el portal sin la carpeta: lo hace mucho más pesado. Sin marcar, «Descargar original» abre el archivo de la carpeta.</span></label>
     <div class="prog" aria-hidden="true"><span id="barra"></span></div>
-    <div class="mut" id="estado" aria-live="polite"></div>
-    <details style="margin-top:10px"><summary>Opcional: ficha, orden y documentos pendientes (índice)</summary>
+    <div id="estado" aria-live="polite"></div>
+    <details><summary>Opcional: ficha, orden y documentos pendientes (índice)</summary>
       <p>Crea una plantilla con todos los archivos, complétala en Excel y guárdala en la carpeta como <b>indice.csv</b> o <b>indice.xlsx</b>. Luego vuelve a generar. Las filas sin archivo aparecen como «Pendiente».</p>
       <button type="button" class="sec" id="bPlantilla">Crear plantilla del índice</button>
       <table class="f"><tr><td>Archivo</td><td>Titulo</td><td>Seccion</td><td>Orden</td><td>Revision</td><td>Responsable</td><td>Fecha</td><td>Estado</td><td>Nota</td></tr></table>
-    </details>
+    </details></div>
   </section>
-  <section class="card fin" id="fin" hidden><h2>Portal generado</h2><p id="finTxt"></p>
-    <div class="fila"><button type="button" id="bAbrir">Abrir el portal</button><span class="mut">Puedes cerrar esta página. Para actualizar el portal, vuelve a generarlo.</span></div></section>
-  <section class="card"><h2>Registro</h2><div id="log" aria-live="polite"><div>Elige una carpeta para empezar.</div></div></section>
-  <p class="mut">Formatos antiguos (.doc, .xls, .ppt) quedan solo para descargar: guárdalos como .docx/.xlsx/.pptx para verlos en el portal. Se ignoran archivos temporales (~$…) y carpetas que empiezan con _ o «.».</p>
+
+  <section class="paso fin" id="fin" hidden><div class="num" aria-hidden="true">3</div><div class="c"><h2>Portal generado</h2><p id="finTxt"></p>
+    <div class="fila"><button type="button" id="bAbrir">Abrir el portal</button><span class="mut">Para actualizarlo, vuelve a generarlo.</span></div></div></section>
+
+  <section class="registro"><h2>Registro</h2><div id="log" aria-live="polite"><div>Elige una carpeta para empezar.</div></div></section>
+  <p class="pie">Los formatos antiguos (.doc, .xls, .ppt) quedan solo para descargar: guárdalos como .docx, .xlsx o .pptx para verlos en el portal. Se ignoran los archivos temporales (~$…) y las carpetas que empiezan con «_» o «.».</p>
 </main>
 <script>/*__PDFJS__*/</script>
 <script type="text/plain" id="pdfjs-worker">/*__PDFWORKER__*/</script>

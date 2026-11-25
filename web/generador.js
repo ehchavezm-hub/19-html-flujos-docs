@@ -682,7 +682,7 @@ async function elegirCarpeta() {
 function listo() {
   const n = ENTRADAS.filter(e => TIPOS[ext(e.ruta)] && !esConfig(e.ruta) && !esGenerador(e.ruta)).length;
   $('#carpeta').textContent = NOMBRE; $('#resumen').textContent = n + ' documento(s) encontrados en ' + ENTRADAS.length + ' archivo(s)';
-  $('#titulo').value = NOMBRE; $('#bGenerar').disabled = !n; $('#bPlantilla').disabled = !n; $('#paso2').hidden = false;
+  $('#titulo').value = NOMBRE; $('#bGenerar').disabled = !n; $('#bPlantilla').disabled = !n; $('#paso2').hidden = false; $('#paso1').classList.add('listo'); $('#paso2').classList.remove('listo');
   const cf = ENTRADAS.find(e => esConfig(e.ruta));
   if (cf) leerConfig(cf.file).then(c => { if (c.titulo) $('#titulo').value = c.titulo; $('#resumen').textContent += ' · configuración: ' + cf.ruta; }).catch(() => {});
 }
@@ -706,7 +706,7 @@ async function generar() {
       '.<br>' + disp + ' documentos · ' + meta.filter(m => m.tipo === 'pendiente').length + ' pendientes · ' + mb.toFixed(1) + ' MB' + (AVISOS.length ? ' · <span class="av">' + AVISOS.length + ' aviso(s) en el registro</span>' : '');
     if (mb > 50) aviso('El portal pesa ' + mb.toFixed(0) + ' MB: puede tardar en abrir o no pasar por correo. Conviene dividir la carpeta.');
     $('#bAbrir').onclick = () => window.open(URL.createObjectURL(new Blob([html], {type: 'text/html'})), '_blank');
-    $('#fin').hidden = false; window.__resultado = {html, meta, avisos: AVISOS};
+    $('#fin').hidden = false; $('#paso2').classList.add('listo'); window.__resultado = {html, meta, avisos: AVISOS};
   } catch (er) { log('Error: ' + er.message, 'av'); $('#estado').textContent = 'Hubo un error'; console.error(er); }
   $('#bGenerar').disabled = false; $('#bElegir').disabled = false;
 }
