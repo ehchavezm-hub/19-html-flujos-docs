@@ -20,7 +20,7 @@ const dec = new TextDecoder(), enc = new TextEncoder();
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
 const clave = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '');
 const ext = n => (n.match(/\.[^.\/]+$/) || [''])[0].toLowerCase();
-const tituloDe = n => n.replace(/^.*\//, '').replace(/\.[^.]+$/, '').replace(/_+/g, ' ').replace(/\s+/g, ' ').trim();
+const tituloDe = n => n.replace(/#U([0-9a-fA-F]{4})/g, (m, h) => String.fromCharCode(parseInt(h, 16))).replace(/^.*\//, '').replace(/\.[^.]+$/, '').replace(/_+/g, ' ').replace(/\s+/g, ' ').trim();
 const fechaDe = ms => { const d = new Date(ms); return String(d.getDate()).padStart(2, '0') + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + d.getFullYear(); };
 function b64(u8) { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); }
 function b64txt(t) { return b64(enc.encode(t)); }
@@ -532,20 +532,26 @@ function porTitulo(titulo, candidatos, todosArch) {
 async function leerConfig(file) {
   const X = await leerXlsx(new Uint8Array(await file.arrayBuffer()));
   const h = X.hojas.find(x => x.estado === 'visible') || X.hojas[0]; if (!h) return null;
-  const cfg = {titulo: '', subtitulo: '', buscador: true, reglas: [], excepciones: [], archivo: file.name}; let enDocs = false;
+  const cfg = {titulo: '', proyecto: '', subtitulo: '', buscador: true, reglas: [], excepciones: [], archivo: file.name}; let enDocs = false; const titulos = [];
   for (const r of todos(h.doc, 'row')) {
     const v = {}; for (const c of hijos(r, 'c')) { const [, cc] = colNum(at(c, 'r')); v[cc] = valorCelda(c, X).txt.trim(); }
     const a = v[1] || '', b = v[2] || '', c = v[3] || '', k = nrm(a).replace(/:$/, '');
     if (!a && !b) continue;
     if (k.startsWith('excepcion')) { if (b) cfg.excepciones.push(b); continue; }
-    if (k === 'titulo') { cfg.titulo = b; continue; }
+    // «Título:» o varios «Título 1:», «Título 2:»… (el primero es el proyecto, el último el título del portal)
+    const mt = k.match(/^titulo\s*(\d+)$/);
+    if (k === 'titulo' || mt) { if (b) titulos.push([mt ? +mt[1] : 0, b]); continue; }
     if (k === 'subtitulo') { cfg.subtitulo = b; continue; }
     if (k === 'buscador') { cfg.buscador = !!b && !/^(no|ninguno|sin|oculto|0)$/.test(nrm(b)); continue; }
     if (k.startsWith('documentos') && !b) { enDocs = true; continue; }
     if (k.startsWith('menu')) continue;
     // columna C (opcional): nombre del archivo; si está, manda sobre la búsqueda por título
-    if (enDocs && a && (b || c)) cfg.reglas.push({seccion: nombreSeccion(a), patron: b || c, archivo: c});
+    // «Pendiente» en la columna C: el documento aún no tiene archivo
+    const pend = /^pendiente$/.test(nrm(c));
+    if (enDocs && a && (b || c)) cfg.reglas.push({seccion: nombreSeccion(a), patron: b || c, archivo: pend ? '' : c, pendiente: pend});
   }
+  titulos.sort((x, y) => x[0] - y[0]);
+  if (titulos.length) { cfg.titulo = titulos[titulos.length - 1][1]; if (titulos.length > 1) cfg.proyecto = titulos[0][1]; }
   return cfg;
 }
 
@@ -574,7 +580,8 @@ async function construir(entradas, nombreCarpeta, opciones) {
     const meta = new Map(); for (const f of indice) if (f.archivo) meta.set(nrm(f.archivo.split(/[\\/]/).pop()).replace(/\.[^.]+$/, ''), f);
     const filas = [], asignados = new Set(), vistos = new Set(); let orden = 0;
     for (const rg of cfg.reglas) {
-      const clave = rg.seccion + '|' + nrm(rg.patron); if (vistos.has(clave)) continue; vistos.add(clave);
+      const clave = rg.seccion + '|' + nrm(rg.patron) + '|' + nrm(rg.archivo || '') + (rg.pendiente ? '|pendiente' : ''); if (vistos.has(clave)) continue; vistos.add(clave);
+      if (rg.pendiente) { filas.push({archivo: '', titulo: rg.patron, seccion: rg.seccion, orden: String(++orden), estado: 'Pendiente'}); continue; }
       if (rg.archivo) {                 // archivo indicado en la columna C
         let e = validas.find(e => !asignados.has(e) && coincide(rg.archivo, e.ruta, false)) || validas.find(e => !asignados.has(e) && coincide(rg.archivo, e.ruta, true));
         if (!e) { filas.push({archivo: '', titulo: rg.patron, seccion: rg.seccion, orden: String(++orden), estado: 'Pendiente'}); aviso('Configuración: el archivo «' + rg.archivo + '» (columna C) no está en la carpeta; «' + rg.patron + '» se muestra como pendiente.'); continue; }
@@ -655,7 +662,7 @@ async function construir(entradas, nombreCarpeta, opciones) {
   const ahora = new Date(); const gen = fechaDe(ahora) + ' ' + String(ahora.getHours()).padStart(2, '0') + ':' + String(ahora.getMinutes()).padStart(2, '0');
   const titulo = opciones.titulo || (cfg && cfg.titulo) || nombreCarpeta;
   const html = PLANTILLA.split('__TITULO__').join(esc(titulo)).split('__FONTFACE__').join(FONTFACE).split('__FONT__').join(FONT)
-    .split('__GENERADO__').join(gen).split('__SUBTITULO__').join(cfg && cfg.subtitulo ? '<em>' + esc(cfg.subtitulo) + '</em>' : '').split('__BUSCADOR__').join(cfg && !cfg.buscador ? ' hidden' : '').replace('__META__', () => JSON.stringify(meta).replace(/<\//g, '<\\/')).replace('__PAYLOAD__', () => payload.join('\n'));
+    .split('__GENERADO__').join(gen).split('__PROYECTO__').join(cfg && cfg.proyecto ? '<small class="proy">' + esc(cfg.proyecto) + '</small>' : '').split('__SUBTITULO__').join(cfg && cfg.subtitulo ? '<em>' + esc(cfg.subtitulo) + '</em>' : '').split('__BUSCADOR__').join(cfg && !cfg.buscador ? ' hidden' : '').replace('__META__', () => JSON.stringify(meta).replace(/<\//g, '<\\/')).replace('__PAYLOAD__', () => payload.join('\n'));
   return {html, meta};
 }
 

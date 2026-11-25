@@ -7,19 +7,19 @@
 :root{--tinta:#1d2327;--tinta2:#39424a;--mut:#5a646b;--linea:#c3cacd;--linea2:#e1e5e6;--fondo:#eef0f0;--papel:#fff;--horm:#e3e6e6;
 --acc:#c2470a;--acc-osc:#a33b07;--acc-suave:#fbe8dc;--ok:#2d6a3e;--ok-suave:#e6f2ea;--warn:#8a5a0b;--r:6px}
 *{box-sizing:border-box}[hidden]{display:none!important}
-body{margin:0;font-family:Figtree,'Segoe UI',system-ui,sans-serif;color:var(--tinta);background:var(--fondo);-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;line-height:1.45}
+body{margin:0;font-family:Figtree,'Segoe UI',system-ui,sans-serif;color:var(--tinta);background:#edf2f6;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;line-height:1.45}
 :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 .hoja{max-width:860px;margin:32px auto 48px;padding:0 20px}
 /* cabecera como rótulo de plano */
-.cab{display:grid;grid-template-columns:1fr auto;border:1.5px solid var(--tinta);background:var(--papel);border-radius:2px}
-.cab .t{padding:16px 20px 15px}.cab h1{margin:0;font-size:26px;font-weight:780;letter-spacing:-.025em;line-height:1.12}
+.cab{display:grid;grid-template-columns:1fr auto;border:1.5px solid #1f3a56;background:var(--papel);border-radius:3px;overflow:hidden;border-top:4px solid var(--acc)}
+.cab .t{padding:16px 20px 15px;background:#1f3a56;color:#fff}.cab h1{margin:0;font-size:26px;font-weight:780;letter-spacing:-.025em;line-height:1.12}.cab .t p{color:#c9d7e4}
 .cab p{margin:6px 0 0;color:var(--tinta2);font-size:14.5px;max-width:58ch;text-wrap:pretty}
 .cab .d{border-left:1px solid var(--linea);display:grid;align-content:stretch;min-width:190px}
 .cab .d div{padding:8px 14px;border-bottom:1px solid var(--linea2)}.cab .d div:last-child{border-bottom:0}
 .cab small{display:block;font-size:11px;color:var(--mut)}.cab b{font-size:13px;font-weight:650}
 /* pasos: una secuencia real (1 elegir, 2 generar, 3 abrir) */
 .paso{display:grid;grid-template-columns:52px 1fr;margin-top:14px;background:var(--papel);border:1px solid var(--linea);border-radius:2px}
-.paso>.num{display:grid;place-items:start center;padding-top:16px;font-size:20px;font-weight:780;color:var(--tinta);border-right:1px solid var(--linea2);font-variant-numeric:tabular-nums}
+.paso>.num{display:grid;place-items:start center;padding-top:16px;font-size:20px;font-weight:780;color:#1f3a56;background:#dbe6f1;border-right:1px solid var(--linea2);font-variant-numeric:tabular-nums}
 .paso>.c{padding:15px 20px 18px;min-width:0}
 .paso h2{margin:0 0 4px;font-size:17px;font-weight:720;letter-spacing:-.01em}
 .paso p{margin:0 0 14px;color:var(--tinta2);font-size:14px;max-width:66ch;text-wrap:pretty}
@@ -42,7 +42,7 @@ details{margin-top:14px;font-size:13.5px;color:var(--tinta2);border-top:1px soli
 details summary{cursor:pointer;color:var(--tinta);font-weight:650}details p{margin:8px 0 10px}
 table.f{border-collapse:collapse;font-size:12px;margin-top:10px;display:block;overflow-x:auto}table.f td{border:1px solid var(--linea);padding:5px 8px;white-space:nowrap}
 .registro{margin-top:14px;background:var(--papel);border:1px solid var(--linea);border-radius:2px}
-.registro h2{margin:0;padding:10px 16px;font-size:13px;font-weight:700;border-bottom:1px solid var(--linea2)}
+.registro h2{margin:0;padding:9px 16px;font-size:13px;font-weight:700;color:#fff;background:#1f3a56}
 #log{max-height:240px;overflow:auto;font-size:12.5px;padding:8px 16px 10px;color:var(--mut);overscroll-behavior:contain}
 #log div{padding:1px 0}#log .av,.av{color:var(--warn);font-weight:500}
 .aviso{background:var(--acc-suave);border-left:3px solid var(--acc);padding:10px 14px;font-size:13.5px;margin-bottom:14px}
