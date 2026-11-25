@@ -22,7 +22,7 @@ Si la carpeta está en Google Drive, usa la carpeta sincronizada en la PC (Googl
 | Formato | Vista |
 |---|---|
 | `.drawio` | Dibujo con sus colores y formas originales; varias páginas, zoom, arrastre y **paso a paso** |
-| `.pdf` | **Convertido a HTML**: texto real (se selecciona y se busca), líneas y tablas en vectores, imágenes reducidas; ya no se incrusta el PDF |
+| `.pdf` | **Reconstruido como HTML real**: párrafos (`<p>`) con su alineación, negritas y colores; tablas como `<table>` (filas, columnas, celdas combinadas, bordes y fondos); imágenes en su lugar. Solo lo que es dibujo (logos vectoriales, texto girado) queda como SVG. Ya no se incrusta el PDF |
 | `.html` | Aislado, con sus imágenes y estilos incrustados |
 | Word `.docx` | Textos, títulos, listas, tablas e imágenes |
 | Excel `.xlsx` / `.xlsm` | Tablas por hoja: valores, colores, celdas combinadas (sin formato condicional ni gráficos) |
@@ -80,7 +80,7 @@ En Windows también: doble clic en `generar_portal.bat` (o arrastrar la carpeta 
 | `Generador de portal.html` | **Entregable** para usuarios. Se arma con `python construir_generador.py` |
 | `web/generador.js` · `web/generador_base.html` | Código del generador en el navegador (JavaScript) |
 | `web/motor_drawio.js` | Motor de drawio: traducción fiel de `motor_drawio.py` (mismo dibujo: carriles con color, decisiones en ámbar, paso a paso) |
-| `web/pdf_html.js` · `web/vendor/` | PDF → HTML. Usa PDF.js 3.11.174 (Apache-2.0, `web/vendor/PDFJS_LICENSE.txt`) solo para leer el PDF; el dibujo (SVG con texto, vectores e imágenes) lo arma `pdf_html.js` |
+| `web/pdf_html.js` · `web/vendor/` | PDF → HTML. Usa PDF.js 3.11.174 (Apache-2.0, `web/vendor/PDFJS_LICENSE.txt`) solo para leer el PDF; la reconstrucción (párrafos, tablas, imágenes) la hace `pdf_html.js`; si una página no se puede reconstruir, queda dibujada como SVG |
 | `web/office.js` | Word y PowerPoint: tema, estilos, numeración, tablas, páginas, cuadros de texto, formas, imágenes, patrón y diseño |
 | `generar_portal.py` | Versión Python y **plantilla del visor** compartida por ambas versiones |
 | `motor_drawio.py` · `conversores_office.py` | Conversores de la versión Python |
