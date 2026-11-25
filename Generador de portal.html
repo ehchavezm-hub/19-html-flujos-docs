@@ -816,13 +816,13 @@ const OX = (() => {
         const pPr = kid(p, 'pPr'); const lvl = num(A(pPr, 'lvl'));
         const capas = capasNivel([...capasBase, lst], lvl);
         const pp = propsTexto(capas, pPr, null, ctx);
-        let runs = ''; let hay = false;
+        let runs = ''; let hay = false; let szMax = 0;
         for (const r of p.children) {
           if (r.localName === 'br') { runs += '<br>'; continue; }
           if (r.localName !== 'r' && r.localName !== 'fld') continue;
           let t = desc(r, 't').map(x => x.textContent).join(''); if (r.localName === 'fld' && /slidenum/i.test(A(r, 'type') || '')) t = String(numDiap);
           if (!t) continue; hay = true; textos.push(t);
-          const rp = propsTexto(capas, pPr, kid(r, 'rPr'), ctx);
+          const rp = propsTexto(capas, pPr, kid(r, 'rPr'), ctx); if (t.trim() && rp.sz > szMax) szMax = rp.sz;
           const col = rp.color || ctx.colorTexto;
           const st = ['font-size:' + PT(rp.sz * escalaF) + 'cqw'];
           if (rp.b) st.push('font-weight:700'); if (rp.i) st.push('font-style:italic'); if (rp.u) st.push('text-decoration:underline'); if (rp.caps) st.push('text-transform:uppercase');
@@ -835,9 +835,8 @@ const OX = (() => {
           bu = '<span class="bu" style="' + (pp.buClr ? 'color:' + pp.buClr.css + ';' : '') + 'width:' + CQ(Math.max(-pp.indent, 0)) + 'cqw">' + esc(ch) + '</span>'; }
         const al = {ctr: 'center', r: 'right', just: 'justify', dist: 'justify'}[pp.algn] || 'left';
         const lh = pp.lnSpc ? pp.lnSpc * 1.2 * (ctx.lnRed || 1) : 1.2 * (ctx.lnRed || 1);
-        const ps = ['text-align:' + al, 'line-height:' + f2(lh), 'font-size:' + PT(pe.sz * escalaF) + 'cqw', 'padding-left:' + CQ(pp.marL) + 'cqw', 'text-indent:' + CQ(bu ? 0 : pp.indent) + 'cqw'];
+        const ps = ['text-align:' + al, 'line-height:' + f2(lh), 'font-size:' + PT((szMax || pe.sz) * escalaF) + 'cqw', 'padding-left:' + CQ(pp.marL) + 'cqw', 'text-indent:' + CQ(pp.indent) + 'cqw'];
         if (pp.spcBef) ps.push('margin-top:' + PT(pp.spcBef * escalaF) + 'cqw'); if (pp.spcAft) ps.push('margin-bottom:' + PT(pp.spcAft * escalaF) + 'cqw');
-        if (bu) ps.push('margin-left:' + CQ(pp.indent) + 'cqw');
         o += '<p style="' + ps.join(';') + '">' + bu + (runs || '&nbsp;') + '</p>';
       }
       return o;
@@ -981,9 +980,9 @@ const OX = (() => {
       "body{margin:0;background:#3a3f4b;font-family:Figtree,'Segoe UI',system-ui,sans-serif;color:#000;padding:20px}" +
       '.s{position:relative;max-width:1100px;margin:0 auto 22px;box-shadow:0 2px 10px #0006;overflow:hidden;container-type:inline-size}' +
       '.n{position:absolute;right:8px;bottom:5px;font-size:11px;color:#8a90a0;z-index:50;background:#fffc;padding:0 4px;border-radius:3px}' +
-      '.f{position:absolute;box-sizing:border-box}.geo{position:absolute;inset:0;width:100%;height:100%}' +
+      '.f{position:absolute;box-sizing:border-box;min-width:1px;min-height:1px}.f>img{display:block}.geo{position:absolute;inset:0;width:100%;height:100%}' +
       '.tx{position:absolute;inset:0;display:flex;flex-direction:column;box-sizing:border-box;overflow:visible;font-size:' + PT(18) + 'cqw}' +
-      '.tx p{margin:0}.bu{display:inline-block}' +
+      '.tx p{margin:0}.bu{display:inline-block;text-indent:0}' +
       '.nd{position:absolute;inset:0;background:#eef0f4;border:1px dashed #b8bfcc;color:#7a8396;display:flex;align-items:center;justify-content:center;font-size:1.1cqw}' +
       'table{border-collapse:collapse}td{border:1px solid #fff;vertical-align:top;overflow:hidden}td p{margin:0}' +
       '</style></head><body>' + slides.join('') + '</body></html>';
@@ -1059,6 +1058,10 @@ const OX = (() => {
       const bd = kid(p, 'pBdr'); if (bd) { pr.bordes = Object.assign({}, pr.bordes || {}); for (const b of bd.children) pr.bordes[b.localName] = b; }
       if (onOff(kid(p, 'pageBreakBefore'))) pr.saltoAntes = true;
       if (kid(p, 'contextualSpacing')) pr.contextual = onOff(kid(p, 'contextualSpacing'));
+      const tb = kid(p, 'tabs'); if (tb) { const m = new Map((pr.tabs || []).map(t => [t.pos, t]));
+        for (const t of tb.children) { if (t.localName !== 'tab') continue; const pos = num(A(t, 'w:pos')), v = A(t, 'w:val');
+          if (v === 'clear') m.delete(pos); else m.set(pos, {pos, val: v === 'end' ? 'right' : v === 'start' ? 'left' : v, lider: A(t, 'w:leader') || 'none'}); }
+        pr.tabs = [...m.values()].sort((a, b) => a.pos - b.pos); }
       return pr;
     }
     function propsParrafo(pPr) {
@@ -1087,6 +1090,9 @@ const OX = (() => {
       const fill = await rellenoFinal(sp, stR, T, {imagen: bf => img(ctx.rels, bf), ph: stR.ph});
       let ln = linea(sp, T, {}); if (!ln && stR.line) ln = {color: stR.line.color, w: stR.line.w}; if (ln && !ln.ninguno && !ln.color && stR.line) ln.color = stR.line.color;
       const gm = geom(sp, w, h);
+      if ((!w || !h) && ln && !ln.ninguno && ln.color) {     // línea recta horizontal o vertical (conector de alto o ancho cero)
+        const sw = f2(ln.w ? Math.max(EPX(ln.w), 0.6) : 1);
+        return '<svg style="position:absolute;left:0;top:0;overflow:visible" width="' + (w ? '100%' : '2') + '" height="' + (h ? '100%' : '2') + '"><line x1="0" y1="0" x2="' + (w ? '100%' : '0') + '" y2="' + (h ? '100%' : '0') + '" stroke="' + ln.color.css + '" stroke-width="' + sw + '"/></svg>'; }
       let o = (fill && !fill.ninguno) || (ln && !ln.ninguno && ln.color) ? svgForma(gm, w, h, fill, ln, ln && ln.w ? Math.max(EPX(ln.w), 0.6) : 1, '', 'w' + (++ctx.uid.n)) : '';
       const tb = desc1(el, 'txbxContent');
       if (tb) { const bp = kid(el, 'bodyPr'); const ins = [A(bp, 'tIns') ?? 45720, A(bp, 'rIns') ?? 91440, A(bp, 'bIns') ?? 45720, A(bp, 'lIns') ?? 91440].map(v => f2(EPX(num(v))) + 'px').join(' ');
@@ -1210,15 +1216,39 @@ const OX = (() => {
       if (pr.fondo) st.push('background:' + pr.fondo);
       if (pr.bordes) for (const [k, css] of [['top', 'top'], ['bottom', 'bottom'], ['left', 'left'], ['right', 'right']]) { const b = cssBorde(pr.bordes[k]); if (b && b !== 'none') st.push('border-' + css + ':' + b + ';padding-' + css + ':' + f2(num(A(pr.bordes[k], 'w:space')) * 1.333) + 'px'); }
       st.push('font-size:' + f2(rMarca.sz) + 'pt'); if (rMarca.font) st.push('font-family:' + familia(rMarca.font));
-      const cont = await runs(p, rBase, Object.assign({}, ctx, {indent: PX(pr.izq)}), {estado: null, instr: ''});
+      let cont = await runs(p, rBase, Object.assign({}, ctx, {indent: PX(pr.izq)}), {estado: null, instr: ''});
+      // tabulaciones: posiciones fijas (desde el margen) y la última a la derecha con puntos guía (índices)
+      const TAB = '<span class="tab"></span>'; let flex = false;
+      // las tabulaciones quedan fuera del <span> de su texto, para poder partir el párrafo por ellas
+      cont = cont.replace(/<span style="([^"]*)">([^<]*(?:<span class="tab"><\/span>[^<]*)+)<\/span>/g, (m, est, inn) => inn.split(TAB).map(t => t ? '<span style="' + est + '">' + t + '</span>' : '').join(TAB));
+      if (pr.tabs && pr.tabs.length && cont.includes(TAB) && !cont.includes(PAG)) {
+        const der = pr.tabs.filter(t => t.val === 'right').pop(); let partesT = cont.split(TAB); let derecha = null;
+        if (der && partesT.length > 1) derecha = partesT.pop();
+        const inicio = pr.izq + (pre ? 0 : pr.primera); const izqs = pr.tabs.filter(t => t.val !== 'right' && t.val !== 'bar' && t.pos > inicio);
+        let x = inicio, h = '';
+        partesT.forEach((c, i) => { if (i === partesT.length - 1) { h += c; return; }
+          const t = izqs.find(t => t.pos > x + 20); if (t) { h += '<span style="display:inline-block;min-width:' + f2(PX(t.pos - x)) + 'px;text-indent:0">' + c + '</span>'; x = t.pos; } else h += c + TAB; });
+        if (derecha !== null) {
+          const ancho = ctx.sec ? ctx.sec.w - ctx.sec.mL - ctx.sec.mR : 0; const pad = ancho ? Math.max(0, ancho - PX(der.pos) - PX(pr.der)) : 0;
+          const lid = {dot: 'dotted', hyphen: 'dashed', underscore: 'solid', middleDot: 'dotted'}[der.lider];
+          cont = '<span class="tl">' + h + '</span><span class="ld"' + (lid ? ' style="border-bottom:1px ' + lid + ' currentColor"' : '') + '></span><span class="tr">' + derecha + '</span>';
+          flex = true; if (pad) st.push('padding-right:' + f2(pad) + 'px');
+        } else cont = h;
+      }
+      if (flex) { st.push('display:flex;align-items:baseline'); if (pre) { cont = cont.replace('<span class="tl">', '<span class="tl">' + pre); pre = ''; } }
       const partes = cont.split(PAG);
-      const visible = c => c.replace(/\u0002F\d+\u0002/g, '').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, '').trim() || /<(img|div|span class="(ab|il|vml))/.test(c);
+      // lo anclado por posición (cuadros de texto, formas) no ocupa renglón: un párrafo que solo tiene eso conserva su altura
+      const sinAb = c => { let o = '', i = 0; for (;;) { const k = c.indexOf('<span class="ab"', i); if (k < 0) return o + c.slice(i); o += c.slice(i, k);
+          let d = 0, j = k; const re = /<span\b|<\/span>/g; re.lastIndex = k; let m; while ((m = re.exec(c))) { d += m[0] === '</span>' ? -1 : 1; if (!d) { j = re.lastIndex; break; } } if (d) return o; i = j; } };
+      const visible = c0 => { const c = sinAb(c0); return c.replace(/\u0002F\d+\u0002/g, '').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, '').trim() || /<(img|div|span class="(il|vml))/.test(c); };
       const abrir = (k, c) => '<div class="p" style="' + st.join(';') + (k > 0 ? ';text-indent:0' : '') + '">' + (k === 0 ? pre : '') + c + (visible(c) || (k === 0 && pre) ? '' : '&nbsp;') + '</div>';
       const out = [];
       partes.forEach((c, k) => {
         if (k > 0) out.push(PAG);
         const vacio = !visible(c) && !(k === 0 && pre);
-        if (partes.length > 1 && vacio && (k === 0 || k < partes.length - 1)) { if (c) out.push(c); return; }   // trozo vacío junto a un corte: no deja renglón en blanco
+        if (partes.length > 1 && vacio && (k === 0 || k < partes.length - 1)) {
+          // sin texto junto a un corte de página: no deja renglón, pero lo anclado al párrafo (cuadros de texto) se ubica desde aquí
+          if (c) out.push(/class="ab"/.test(c) ? '<div class="p" style="' + st.join(';') + ';height:0;margin:0">' + c + '</div>' : c); return; }   // trozo vacío junto a un corte: no deja renglón en blanco
         out.push(abrir(k, c));
       });
       if (pr.saltoAntes && !ctx.enCaja && !ctx.enTabla) out.unshift(PAG);
@@ -1325,8 +1355,8 @@ const OX = (() => {
       '.pag{position:relative;margin:0 auto 24px;background:#fff;box-shadow:0 1px 6px #0003;box-sizing:border-box;overflow:hidden}' +
       '.cuerpo{position:relative;z-index:1}.hd,.ft{position:absolute;z-index:1;color:#000}' +
       '.p{margin:0;position:relative;overflow-wrap:break-word}.num{display:inline-block;text-indent:0;padding-right:4px}' +
-      '.tab{display:inline-block;width:48px}.ab{position:absolute;box-sizing:border-box}.il{display:inline-block;position:relative;vertical-align:bottom}' +
-      '.geo{position:absolute;inset:0;width:100%;height:100%}.tb{position:absolute;inset:0;display:flex;flex-direction:column;box-sizing:border-box;overflow:visible}.tb.crece{position:relative;inset:auto;min-height:100%}' +
+      '.tab{display:inline-block;width:48px}.ld{flex:1;margin:0 3px;min-width:12px;transform:translateY(-0.25em)}.tl{min-width:0}.tr{white-space:nowrap}.ab{position:absolute;box-sizing:border-box}.il{display:inline-block;position:relative;vertical-align:bottom}' +
+      '.geo{position:absolute;inset:0;width:100%;height:100%}.tb{position:absolute;inset:0;display:flex;flex-direction:column;box-sizing:border-box;overflow:hidden}.tb.crece{position:relative;inset:auto;min-height:100%}' +
       '.vml{display:block;border:1px dashed #ccd;padding:4px;margin:4px 0}' +
       '.nd{position:absolute;inset:0;background:#eef0f4;border:1px dashed #b8bfcc;color:#7a8396;display:flex;align-items:center;justify-content:center;font:12px Figtree,sans-serif}' +
       'table.t{border-collapse:collapse;table-layout:fixed}table.t td{overflow-wrap:break-word}img{max-width:none}' +
