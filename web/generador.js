@@ -24,6 +24,8 @@ const tituloDe = n => n.replace(/^.*\//, '').replace(/\.[^.]+$/, '').replace(/_+
 const fechaDe = ms => { const d = new Date(ms); return String(d.getDate()).padStart(2, '0') + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + d.getFullYear(); };
 function b64(u8) { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); }
 function b64txt(t) { return b64(enc.encode(t)); }
+// vistas HTML: se guardan como texto (no base64, que pesa un 33 % más); solo se protege el cierre de <script>
+function vistaTxt(id, t) { return '<script type="text/plain" data-t id="' + id + '">' + t.replace(/<\/(script)/gi, '<\\/$1') + '<\/script>'; }
 function deB64(s) { const b = atob(s); const u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }
 const xml = s => new DOMParser().parseFromString(s, 'application/xml');
 const hijos = (el, n) => el ? [...el.children].filter(c => c.localName === n) : [];
@@ -620,7 +622,13 @@ async function construir(entradas, nombreCarpeta, opciones) {
           for (let k = 0; k < m.paginas.length; k++) { const i = payload.length - m.paginas.length + k; payload[i] = payload[i].replace('id="t-' + id + '-' + (k + 1) + '"', 'id="t-' + id + '-' + k + '"'); }
           if (!m.paginas.length) throw new Error('sin páginas legibles');
           m.texto = tx.join(' ').slice(0, 60000); payload.push('<script type="text/plain" id="o-' + id + '">' + b64(u8) + '<\/script>');
-        } else if (tipo === 'pdf') { m.texto = ''; payload.push('<script type="text/plain" id="o-' + id + '">' + b64(u8) + '<\/script>'); }
+        } else if (tipo === 'pdf') {
+          // PDF → HTML (texto real, vectores e imágenes reducidas). Si no se puede (p. ej. PDF protegido), queda el PDF incrustado.
+          let R = null; try { R = await PDFX.pdfAHtml(u8, d.titulo, (i, n) => { $('#estado').textContent = 'Convirtiendo ' + e.ruta + ': página ' + i + ' de ' + n; }); }
+          catch (er) { aviso(e.ruta + ': no se pudo convertir a HTML (' + er.message + '); se muestra como PDF.'); }
+          if (R) { m.vista = 'html'; m.texto = R.texto.slice(0, 60000); payload.push(vistaTxt('v-' + id, conFigtree(R.page)));
+            if (opciones.originales) payload.push('<script type="text/plain" id="o-' + id + '">' + b64(u8) + '<\/script>'); }
+          else { m.texto = ''; payload.push('<script type="text/plain" id="o-' + id + '">' + b64(u8) + '<\/script>'); } }
         else if (tipo === 'html') { let t; try { t = new TextDecoder('utf-8', {fatal: true}).decode(u8); } catch (er) { t = new TextDecoder('windows-1252').decode(u8); }
           const R = await htmlConRecursos(t, e.ruta, todosArch); m.texto = R.texto; payload.push('<script type="text/plain" id="o-' + id + '">' + b64txt(R.page) + '<\/script>'); }
         else {
@@ -630,7 +638,7 @@ async function construir(entradas, nombreCarpeta, opciones) {
           // el original de Word/Excel/PowerPoint no se copia dentro del portal (lo haría muy pesado): «Descargar original»
           // abre el archivo de la misma carpeta. Solo se incrusta si se marca la opción, o si no hay vista.
           if (opciones.originales || !R) payload.push('<script type="text/plain" id="o-' + id + '">' + b64(u8) + '<\/script>');
-          if (R) { m.vista = 'html'; m.texto = R.texto.slice(0, 60000); if (!m.nota) m.nota = NOTA[tipo]; payload.push('<script type="text/plain" id="v-' + id + '">' + b64txt(conFigtree(R.page)) + '<\/script>'); }
+          if (R) { m.vista = 'html'; m.texto = R.texto.slice(0, 60000); if (!m.nota) m.nota = NOTA[tipo]; payload.push(vistaTxt('v-' + id, conFigtree(R.page))); }
           else { m.vista = 'none'; aviso(e.ruta + ': los formatos antiguos (.doc, .xls, .ppt) no se pueden ver en el navegador; queda para descargar. Guárdalo como .docx/.xlsx/.pptx para verlo.'); }
         }
       } catch (er) { tipo = m.tipo = 'error'; aviso(e.ruta + ': no se pudo convertir (' + er.message + ')'); }

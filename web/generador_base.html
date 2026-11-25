@@ -39,7 +39,7 @@ table.f{border-collapse:collapse;font-size:13px;margin-top:8px}table.f td{border
     <div class="fila"><input type="text" id="titulo" placeholder="Título del portal" aria-label="Título del portal">
       <button type="button" id="bGenerar">Generar portal</button></div>
     <label class="mut" style="display:flex;gap:8px;align-items:flex-start;margin:4px 0 10px"><input type="checkbox" id="originales" style="margin-top:3px">
-      <span>Incluir una copia de los Word, Excel y PowerPoint originales dentro del portal. Solo si vas a enviar el portal sin la carpeta: lo hace mucho más pesado. Sin marcar, «Descargar original» abre el archivo de la carpeta.</span></label>
+      <span>Incluir una copia de los PDF, Word, Excel y PowerPoint originales dentro del portal. Solo si vas a enviar el portal sin la carpeta: lo hace mucho más pesado. Sin marcar, «Descargar original» abre el archivo de la carpeta.</span></label>
     <div class="prog" aria-hidden="true"><span id="barra"></span></div>
     <div class="mut" id="estado" aria-live="polite"></div>
     <details style="margin-top:10px"><summary>Opcional: ficha, orden y documentos pendientes (índice)</summary>
@@ -53,6 +53,8 @@ table.f{border-collapse:collapse;font-size:13px;margin-top:8px}table.f td{border
   <section class="card"><h2>Registro</h2><div id="log" aria-live="polite"><div>Elige una carpeta para empezar.</div></div></section>
   <p class="mut">Formatos antiguos (.doc, .xls, .ppt) quedan solo para descargar: guárdalos como .docx/.xlsx/.pptx para verlos en el portal. Se ignoran archivos temporales (~$…) y carpetas que empiezan con _ o «.».</p>
 </main>
+<script>/*__PDFJS__*/</script>
+<script type="text/plain" id="pdfjs-worker">/*__PDFWORKER__*/</script>
 <script>
 /*__DATOS__*/
 </script>

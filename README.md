@@ -22,15 +22,15 @@ Si la carpeta está en Google Drive, usa la carpeta sincronizada en la PC (Googl
 | Formato | Vista |
 |---|---|
 | `.drawio` | Dibujo con sus colores y formas originales; varias páginas, zoom, arrastre y **paso a paso** |
-| `.pdf` | Visor de PDF del navegador |
+| `.pdf` | **Convertido a HTML**: texto real (se selecciona y se busca), líneas y tablas en vectores, imágenes reducidas; ya no se incrusta el PDF |
 | `.html` | Aislado, con sus imágenes y estilos incrustados |
 | Word `.docx` | Textos, títulos, listas, tablas e imágenes |
 | Excel `.xlsx` / `.xlsm` | Tablas por hoja: valores, colores, celdas combinadas (sin formato condicional ni gráficos) |
 | PowerPoint `.pptx` | Diapositivas con textos, imágenes y tablas en su posición |
 | `.doc` / `.xls` / `.ppt` antiguos | Solo para descargar (guárdalos como `.docx` / `.xlsx` / `.pptx` para verlos) |
 
-Todos los documentos tienen **Descargar original** y **Pantalla completa**. Para que el portal sea liviano, los Word, Excel y PowerPoint no se copian dentro: «Descargar original» abre el archivo de la carpeta (el portal debe quedar junto a los documentos). Si vas a enviar el portal solo, marca «Incluir una copia de los originales». Las fotos grandes se reducen a 1600 px; el **buscador** encuentra títulos,
-datos de la ficha y el texto de los documentos (excepto dentro de los PDF).
+Todos los documentos tienen **Descargar original** y **Pantalla completa**. Para que el portal sea liviano, los PDF, Word, Excel y PowerPoint no se copian dentro: «Descargar original» abre el archivo de la carpeta (el portal debe quedar junto a los documentos). Si vas a enviar el portal solo, marca «Incluir una copia de los originales». Las fotos grandes se reducen a 1600 px; el **buscador** encuentra títulos,
+datos de la ficha y el texto de los documentos (incluido el de los PDF).
 
 ### Configuración del portal (`Configuracion html … .xlsx`)
 
@@ -80,6 +80,7 @@ En Windows también: doble clic en `generar_portal.bat` (o arrastrar la carpeta 
 | `Generador de portal.html` | **Entregable** para usuarios. Se arma con `python construir_generador.py` |
 | `web/generador.js` · `web/generador_base.html` | Código del generador en el navegador (JavaScript) |
 | `web/motor_drawio.js` | Motor de drawio: traducción fiel de `motor_drawio.py` (mismo dibujo: carriles con color, decisiones en ámbar, paso a paso) |
+| `web/pdf_html.js` · `web/vendor/` | PDF → HTML. Usa PDF.js 3.11.174 (Apache-2.0, `web/vendor/PDFJS_LICENSE.txt`) solo para leer el PDF; el dibujo (SVG con texto, vectores e imágenes) lo arma `pdf_html.js` |
 | `web/office.js` | Word y PowerPoint: tema, estilos, numeración, tablas, páginas, cuadros de texto, formas, imágenes, patrón y diseño |
 | `generar_portal.py` | Versión Python y **plantilla del visor** compartida por ambas versiones |
 | `motor_drawio.py` · `conversores_office.py` | Conversores de la versión Python |

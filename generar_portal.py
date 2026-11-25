@@ -459,7 +459,7 @@ const COL={drawio:'var(--drawio)',pdf:'var(--pdf)',html:'var(--html)',word:'var(
 const tag=m=>'<span class="tg" style="--c:'+COL[m.tipo]+'">'+NOM[m.tipo]+'</span>';
 const est=m=>m.estado&&!(m.tipo==='pendiente'&&/^pendiente$/i.test(m.estado))?'<span class="est'+(m.tipo==='pendiente'?' p':'')+'">'+e(m.estado)+'</span>':'';
 const blobs={};
-function bytes(id){const b=atob(document.getElementById(id).textContent.trim());const u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u}
+function bytes(id){const el=document.getElementById(id);if(el.hasAttribute('data-t'))return new TextEncoder().encode(el.textContent.replace(/<\\\/(script)/gi,'</$1'));const b=atob(document.getElementById(id).textContent.trim());const u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u}
 function blobUrl(id,mime){return blobs[id]||(blobs[id]=URL.createObjectURL(new Blob([bytes(id)],{type:mime})))}
 function vista(m){return document.getElementById('v-'+m.id)?'v-'+m.id:'o-'+m.id}
 function descargar(m){const a=document.createElement('a');
@@ -527,7 +527,7 @@ function ver(id){
   } else if((m.tipo==='word'||m.tipo==='excel'||m.tipo==='ppt')&&m.vista==='none'){
     main.innerHTML=h+'<div class="pendbox"><h2>Vista no disponible</h2><p>Este archivo no se pudo convertir en esta PC (falta Microsoft Office, LibreOffice u openpyxl). Puedes descargarlo y abrirlo con su programa.</p><p><button type="button" id="bDesc2">Descargar «'+e(m.nombre)+'»</button></p></div>';
     $('#bDesc2').onclick=()=>descargar(m);
-  } else if(m.tipo==='pdf'||m.vista==='pdf'){
+  } else if((m.tipo==='pdf'&&m.vista!=='html')||m.vista==='pdf'){
     h+='<div class="bar"><span>El zoom, la búsqueda y la impresión del PDF están en la barra del visor.'+(m.vista==='pdf'?' Vista en PDF del archivo original; «Descargar original» baja el '+({word:'Word',excel:'Excel',ppt:'PowerPoint'}[m.tipo])+'.':'')+'</span></div><div class="frame"><iframe title="'+e(m.titulo)+'" src="'+blobUrl(vista(m),'application/pdf')+'"></iframe></div>';
     main.innerHTML=h;
   } else {
