@@ -46,7 +46,7 @@ Si en la carpeta hay un Excel cuyo nombre empieza con **«Configuracion html»**
 | Sección (Organigrama, Flujograma, Documentos en word…) | nombre del archivo o patrón | La fila define la sección y el orden |
 | Excepciones para no colocar en el html: | nombre del archivo | Archivo que no entra al portal |
 
-Patrones de la columna B: **nombre exacto** (con o sin extensión); **«FG…»** = todos los que empiezan con FG;
+La columna B puede ser el **título a mostrar** (por ejemplo «Gestión de RFI · Subcontratista»): el generador lo relaciona con el archivo aunque el nombre difiera («FG_RFI SC revB.drawio»), usando las palabras clave y abreviaturas habituales (SC = Subcontratista, Sup = Supervisión, Act = Actualización…), y muestra ese título en el portal. También acepta **nombre exacto** (con o sin extensión); **«FG…»** = todos los que empiezan con FG;
 **«…doc»**, **«… xls»**, **«…ppt»** = todos los de ese tipo. Un nombre exacto que no esté en la carpeta aparece
 como «Pendiente»; los archivos que no coinciden con ninguna fila van a «Otros documentos». El Excel de
 configuración y el generador nunca entran al portal.

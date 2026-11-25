@@ -486,7 +486,7 @@ function plantillaCsv(rutas) {
 }
 
 // ------------------------------------------------------------------ configuración («Configuracion html … .xlsx» en la misma carpeta)
-const nrm = t => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/…/g, '...').replace(/\s+/g, ' ').trim();
+const nrm = t => String(t ?? '').replace(/#U([0-9a-f]{4})/gi, (m, h) => String.fromCharCode(parseInt(h, 16))).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/…/g, '...').replace(/\s+/g, ' ').trim();
 const esConfig = ruta => !ruta.includes('/') && /^configuracion ?html.*\.xlsx$/.test(nrm(ruta));
 const esGenerador = ruta => /^generador de portal.*\.html?$/.test(nrm(ruta.split('/').pop()));
 const EXT_EQ = {doc: ['doc', 'docx'], docx: ['docx', 'doc'], xls: ['xls', 'xlsx', 'xlsm'], xlsx: ['xlsx', 'xlsm', 'xls'], xlsm: ['xlsm', 'xlsx'], ppt: ['ppt', 'pptx'], pptx: ['pptx', 'ppt'], pdf: ['pdf'], drawio: ['drawio'], html: ['html', 'htm'], htm: ['htm', 'html']};
@@ -506,6 +506,26 @@ function coincide(patron, ruta, flexible) {
   const pStem = p.replace(/\.(drawio|pdf|html?|docx?|xlsx?|xlsm|pptx?)$/, '');
   if (nombre === p || stem === pStem) return true;
   return !!flexible && pStem.length >= 3 && stem.includes(pStem);
+}
+// relación «título a mostrar» → archivo, aunque los nombres difieran («Gestión de RFI · Subcontratista» ↔ «FG_RFI SC revB.drawio»)
+const VACIAS = new Set(['de', 'del', 'la', 'el', 'los', 'las', 'y', 'a', 'en', 'para', 'por', 'con', 'al', 'gestion', 'emision', 'flujo', 'proceso', 'documento', 'documentos', 'rev', 'fg']);
+const SINONIMOS = {subcontratista: ['sc', 'subc'], supervision: ['sup', 'superv'], oficina: ['ot', 'of'], tecnica: ['ot'], cliente: ['cli'], informacion: ['info'], actualizacion: ['act', 'actualiz'], modelo: ['mod']};
+const fichas = t => nrm(t).replace(/\.(drawio|pdf|html?|docx?|xlsx?|xlsm|pptx?)$/, '').split(/[^a-z0-9]+/).filter(Boolean);
+function afinidad(titulo, ruta) {
+  const tt = fichas(titulo).filter(t => !VACIAS.has(t) && !/^rev[a-z0-9]?$/.test(t) && t.length > 1);
+  const ft = fichas(ruta.split('/').pop()), junto = ft.join('');
+  const hits = tt.filter(t => [t, ...(SINONIMOS[t] || [])].some(v => ft.includes(v) || (v.length >= 4 && junto.includes(v)) || ft.some(f => f.length >= 3 && v.length > f.length && v.startsWith(f))));
+  return {score: tt.length ? hits.length / tt.length : 0, hits, n: tt.length};
+}
+function porTitulo(titulo, candidatos, todosArch) {
+  const r = candidatos.map(e => ({e, ...afinidad(titulo, e.ruta)})).filter(x => x.hits.length).sort((a, b) => b.score - a.score);
+  if (!r.length) return null; const best = r[0];
+  if (best.score === 1 && (!r[1] || r[1].score < 1)) return best.e;
+  // palabra distintiva (≥ 6 letras) que solo aparece en un archivo de la carpeta
+  const unica = best.hits.some(h => h.length >= 6 && todosArch.filter(e => afinidad(h, e.ruta).hits.length).length === 1);
+  if (unica && (!r[1] || r[1].score < best.score)) return best.e;
+  if (best.score >= 0.67 && (!r[1] || r[1].score < best.score)) return best.e;
+  return null;
 }
 async function leerConfig(file) {
   const X = await leerXlsx(new Uint8Array(await file.arrayBuffer()));
@@ -554,11 +574,14 @@ async function construir(entradas, nombreCarpeta, opciones) {
       const clave = rg.seccion + '|' + nrm(rg.patron); if (vistos.has(clave)) continue; vistos.add(clave);
       let hits = validas.filter(e => !asignados.has(e) && coincide(rg.patron, e.ruta, false));
       if (!hits.length && !nrm(rg.patron).includes('...')) hits = validas.filter(e => !asignados.has(e) && coincide(rg.patron, e.ruta, true));
+      let porNombre = true;
+      if (!hits.length && !nrm(rg.patron).includes('...')) { const e = porTitulo(rg.patron, validas.filter(x => !asignados.has(x)), validas); if (e) { hits = [e]; porNombre = false; } }
       // marcador igual al nombre de la sección (p. ej. «Organigrama»): busca por las primeras letras («Org…»)
       if (!hits.length && nrm(rg.patron) === nrm(rg.seccion)) hits = validas.filter(e => !asignados.has(e) && coincide(nrm(rg.patron).slice(0, 3) + '...', e.ruta, false));
       if (!hits.length) { if (!nrm(rg.patron).includes('...')) { filas.push({archivo: '', titulo: rg.patron, seccion: rg.seccion, orden: String(++orden), estado: 'Pendiente'}); aviso('Configuración: «' + rg.patron + '» no se encontró en la carpeta; se muestra como pendiente.'); } continue; }
       for (const e of hits) { asignados.add(e); const m = meta.get(nrm(e.ruta.split('/').pop()).replace(/\.[^.]+$/, '')) || {};
-        filas.push(Object.assign({}, m, {archivo: e.ruta, seccion: rg.seccion, orden: String(++orden)})); }
+        const tituloCfg = !nrm(rg.patron).includes('...') && nrm(rg.patron) !== nrm(rg.seccion) && hits.length === 1 ? rg.patron : '';
+        filas.push(Object.assign({titulo: tituloCfg}, m, {archivo: e.ruta, seccion: rg.seccion, orden: String(++orden)})); }
     }
     for (const e of validas) if (!asignados.has(e)) filas.push({archivo: e.ruta, seccion: 'Otros documentos', orden: String(90000 + filas.length)});
     indice = filas;
