@@ -32,6 +32,25 @@ Si la carpeta está en Google Drive, usa la carpeta sincronizada en la PC (Googl
 Todos los documentos tienen **Descargar original** y **Pantalla completa**; el **buscador** encuentra títulos,
 datos de la ficha y el texto de los documentos (excepto dentro de los PDF).
 
+### Configuración del portal (`Configuracion html … .xlsx`)
+
+Si en la carpeta hay un Excel cuyo nombre empieza con **«Configuracion html»** (por ejemplo
+`Configuracion html rev0.xlsx`, plantilla en `plantilla/`), el generador lo usa para organizar el portal:
+
+| Columna A | Columna B | Efecto |
+|---|---|---|
+| Título: | texto | Título del menú y del portal |
+| Subtitulo: | texto | Línea bajo el título |
+| Buscador: | cualquier texto (vacío o «No» lo oculta) | Muestra u oculta el buscador |
+| Documentos: | — | Desde aquí, cada fila es un documento |
+| Sección (Organigrama, Flujograma, Documentos en word…) | nombre del archivo o patrón | La fila define la sección y el orden |
+| Excepciones para no colocar en el html: | nombre del archivo | Archivo que no entra al portal |
+
+Patrones de la columna B: **nombre exacto** (con o sin extensión); **«FG…»** = todos los que empiezan con FG;
+**«…doc»**, **«… xls»**, **«…ppt»** = todos los de ese tipo. Un nombre exacto que no esté en la carpeta aparece
+como «Pendiente»; los archivos que no coinciden con ninguna fila van a «Otros documentos». El Excel de
+configuración y el generador nunca entran al portal.
+
 ### Menú, ficha y pendientes
 
 - Cada **subcarpeta** es una sección del menú; los archivos sueltos van a «General».

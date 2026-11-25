@@ -485,14 +485,60 @@ function plantillaCsv(rutas) {
   return t;
 }
 
+// ------------------------------------------------------------------ configuración («Configuracion html … .xlsx» en la misma carpeta)
+const nrm = t => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/…/g, '...').replace(/\s+/g, ' ').trim();
+const esConfig = ruta => !ruta.includes('/') && /^configuracion ?html.*\.xlsx$/.test(nrm(ruta));
+const esGenerador = ruta => /^generador de portal.*\.html?$/.test(nrm(ruta.split('/').pop()));
+const EXT_EQ = {doc: ['doc', 'docx'], docx: ['docx', 'doc'], xls: ['xls', 'xlsx', 'xlsm'], xlsx: ['xlsx', 'xlsm', 'xls'], xlsm: ['xlsm', 'xlsx'], ppt: ['ppt', 'pptx'], pptx: ['pptx', 'ppt'], pdf: ['pdf'], drawio: ['drawio'], html: ['html', 'htm'], htm: ['htm', 'html']};
+function nombreSeccion(t) {
+  t = String(t || '').replace(/:\s*$/, '').trim();
+  return t.replace(/\bpower ?point\b/i, 'PowerPoint').replace(/\bword\b/i, 'Word').replace(/\bexcel\b/i, 'Excel').replace(/^./, c => c.toUpperCase());
+}
+// patrón de la columna B: nombre exacto (con o sin extensión), «FG…» (empieza con), «…doc» (por extensión) o texto contenido
+function coincide(patron, ruta, flexible) {
+  const nombre = nrm(ruta.split('/').pop()), p = nrm(patron); const xt = ext(nombre).slice(1), stem = nombre.replace(/\.[^.]+$/, '');
+  if (p.includes('...')) {
+    const i = p.indexOf('...'), pre = p.slice(0, i).trim(), post = p.slice(i + 3).trim().replace(/^\.+/, '');
+    if (pre && !nombre.startsWith(pre)) return false;
+    if (post) { if (EXT_EQ[post]) return EXT_EQ[post].includes(xt); return nombre.endsWith(post) || stem.endsWith(post); }
+    return true;
+  }
+  const pStem = p.replace(/\.(drawio|pdf|html?|docx?|xlsx?|xlsm|pptx?)$/, '');
+  if (nombre === p || stem === pStem) return true;
+  return !!flexible && pStem.length >= 3 && stem.includes(pStem);
+}
+async function leerConfig(file) {
+  const X = await leerXlsx(new Uint8Array(await file.arrayBuffer()));
+  const h = X.hojas.find(x => x.estado === 'visible') || X.hojas[0]; if (!h) return null;
+  const cfg = {titulo: '', subtitulo: '', buscador: true, reglas: [], excepciones: [], archivo: file.name}; let enDocs = false;
+  for (const r of todos(h.doc, 'row')) {
+    const v = {}; for (const c of hijos(r, 'c')) { const [, cc] = colNum(at(c, 'r')); v[cc] = valorCelda(c, X).txt.trim(); }
+    const a = v[1] || '', b = v[2] || '', k = nrm(a).replace(/:$/, '');
+    if (!a && !b) continue;
+    if (k.startsWith('excepcion')) { if (b) cfg.excepciones.push(b); continue; }
+    if (k === 'titulo') { cfg.titulo = b; continue; }
+    if (k === 'subtitulo') { cfg.subtitulo = b; continue; }
+    if (k === 'buscador') { cfg.buscador = !!b && !/^(no|ninguno|sin|oculto|0)$/.test(nrm(b)); continue; }
+    if (k.startsWith('documentos') && !b) { enDocs = true; continue; }
+    if (k.startsWith('menu')) continue;
+    if (enDocs && a && b) cfg.reglas.push({seccion: nombreSeccion(a), patron: b});
+  }
+  return cfg;
+}
+
 // ------------------------------------------------------------------ armado del portal
 async function esPortal(f) { if (!/\.html?$/i.test(f.name)) return false; return (await f.slice(0, 4000).text()).includes(GENERADOR); }
 async function construir(entradas, nombreCarpeta, opciones) {
   AVISOS = [];
+  const cfgE = entradas.find(e => esConfig(e.ruta)) || null; let cfg = null;
+  if (cfgE) { try { cfg = await leerConfig(cfgE.file); log('Configuración: ' + cfgE.ruta + ' · ' + cfg.reglas.length + ' fila(s) de documentos, ' + cfg.excepciones.length + ' excepción(es)'); }
+    catch (er) { aviso('No se pudo leer la configuración «' + cfgE.ruta + '» (' + er.message + '); se usa el orden por carpetas.'); } }
   const validas = [];
   for (const e of entradas) {
     const partes = e.ruta.split('/'); if (partes.some(p => p.startsWith('.') || p.startsWith('_')) || partes[partes.length - 1].startsWith('~$')) continue;
-    if (!TIPOS[ext(e.ruta)]) continue; if (await esPortal(e.file)) continue; validas.push(e);
+    if (!TIPOS[ext(e.ruta)] || esConfig(e.ruta) || esGenerador(e.ruta)) continue;
+    if (cfg && cfg.excepciones.some(x => coincide(x, e.ruta, false))) continue;
+    if (await esPortal(e.file)) continue; validas.push(e);
   }
   validas.sort((a, b) => a.ruta.toLowerCase().localeCompare(b.ruta.toLowerCase()));
   const todosArch = new Map(entradas.map(e => [e.ruta.toLowerCase(), e.file]));
@@ -501,6 +547,22 @@ async function construir(entradas, nombreCarpeta, opciones) {
   if (idx) { try { indice = await leerIndice(idx.file); log('Índice: ' + idx.ruta + ' (' + indice.length + ' filas)'); } catch (er) { aviso('No se pudo leer el índice (' + er.message + ')'); } }
   const porRuta = new Map(validas.map(e => [e.ruta.toLowerCase(), e])), porNombre = new Map();
   for (const e of validas) { const n = e.ruta.split('/').pop().toLowerCase(); if (!porNombre.has(n)) porNombre.set(n, e); }
+  if (cfg && cfg.reglas.length) {   // la configuración define secciones y orden; el índice (si existe) aporta la ficha
+    const meta = new Map(); for (const f of indice) if (f.archivo) meta.set(nrm(f.archivo.split(/[\\/]/).pop()).replace(/\.[^.]+$/, ''), f);
+    const filas = [], asignados = new Set(), vistos = new Set(); let orden = 0;
+    for (const rg of cfg.reglas) {
+      const clave = rg.seccion + '|' + nrm(rg.patron); if (vistos.has(clave)) continue; vistos.add(clave);
+      let hits = validas.filter(e => !asignados.has(e) && coincide(rg.patron, e.ruta, false));
+      if (!hits.length && !nrm(rg.patron).includes('...')) hits = validas.filter(e => !asignados.has(e) && coincide(rg.patron, e.ruta, true));
+      // marcador igual al nombre de la sección (p. ej. «Organigrama»): busca por las primeras letras («Org…»)
+      if (!hits.length && nrm(rg.patron) === nrm(rg.seccion)) hits = validas.filter(e => !asignados.has(e) && coincide(nrm(rg.patron).slice(0, 3) + '...', e.ruta, false));
+      if (!hits.length) { if (!nrm(rg.patron).includes('...')) { filas.push({archivo: '', titulo: rg.patron, seccion: rg.seccion, orden: String(++orden), estado: 'Pendiente'}); aviso('Configuración: «' + rg.patron + '» no se encontró en la carpeta; se muestra como pendiente.'); } continue; }
+      for (const e of hits) { asignados.add(e); const m = meta.get(nrm(e.ruta.split('/').pop()).replace(/\.[^.]+$/, '')) || {};
+        filas.push(Object.assign({}, m, {archivo: e.ruta, seccion: rg.seccion, orden: String(++orden)})); }
+    }
+    for (const e of validas) if (!asignados.has(e)) filas.push({archivo: e.ruta, seccion: 'Otros documentos', orden: String(90000 + filas.length)});
+    indice = filas;
+  }
   const usados = new Set(), docs = [];
   indice.forEach((f, k) => {
     const arch = (f.archivo || '').replace(/\\/g, '/').trim(); let e = null;
@@ -551,9 +613,9 @@ async function construir(entradas, nombreCarpeta, opciones) {
     meta.push(m);
   }
   const ahora = new Date(); const gen = fechaDe(ahora) + ' ' + String(ahora.getHours()).padStart(2, '0') + ':' + String(ahora.getMinutes()).padStart(2, '0');
-  const titulo = opciones.titulo || nombreCarpeta;
+  const titulo = opciones.titulo || (cfg && cfg.titulo) || nombreCarpeta;
   const html = PLANTILLA.split('__TITULO__').join(esc(titulo)).split('__FONTFACE__').join(FONTFACE).split('__FONT__').join(FONT)
-    .split('__GENERADO__').join(gen).replace('__META__', () => JSON.stringify(meta).replace(/<\//g, '<\\/')).replace('__PAYLOAD__', () => payload.join('\n'));
+    .split('__GENERADO__').join(gen).split('__SUBTITULO__').join(cfg && cfg.subtitulo ? '<em>' + esc(cfg.subtitulo) + '</em>' : '').split('__BUSCADOR__').join(cfg && !cfg.buscador ? ' hidden' : '').replace('__META__', () => JSON.stringify(meta).replace(/<\//g, '<\\/')).replace('__PAYLOAD__', () => payload.join('\n'));
   return {html, meta};
 }
 
@@ -578,9 +640,11 @@ async function elegirCarpeta() {
   } else $('#entrada').click();
 }
 function listo() {
-  const n = ENTRADAS.filter(e => TIPOS[ext(e.ruta)]).length;
+  const n = ENTRADAS.filter(e => TIPOS[ext(e.ruta)] && !esConfig(e.ruta) && !esGenerador(e.ruta)).length;
   $('#carpeta').textContent = NOMBRE; $('#resumen').textContent = n + ' documento(s) encontrados en ' + ENTRADAS.length + ' archivo(s)';
-  $('#titulo').value = $('#titulo').value || NOMBRE; $('#bGenerar').disabled = !n; $('#bPlantilla').disabled = !n; $('#paso2').hidden = false;
+  $('#titulo').value = NOMBRE; $('#bGenerar').disabled = !n; $('#bPlantilla').disabled = !n; $('#paso2').hidden = false;
+  const cf = ENTRADAS.find(e => esConfig(e.ruta));
+  if (cf) leerConfig(cf.file).then(c => { if (c.titulo) $('#titulo').value = c.titulo; $('#resumen').textContent += ' · configuración: ' + cf.ruta; }).catch(() => {});
 }
 async function guardar(nombre, contenido, tipo) {
   if (CARPETA) {

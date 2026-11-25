@@ -345,7 +345,7 @@ def generar(docs_dir, salida, titulo, indice_path, modo_word='auto', modo_excel=
                 else:
                     payload.append(f'<script type="text/plain" id="o-{did}">{info["datos"]}</script>')
             meta.append(m)
-    pagina = PLANTILLA.replace('__TITULO__', esc(titulo)).replace('__FONT__', FONT).replace('__FONTFACE__', FONTFACE) \
+    pagina = PLANTILLA.replace('__TITULO__', esc(titulo)).replace('__FONT__', FONT).replace('__FONTFACE__', FONTFACE).replace('__SUBTITULO__', '').replace('__BUSCADOR__', '') \
         .replace('__GENERADO__', dt.datetime.now().strftime('%d-%m-%Y %H:%M')) \
         .replace('__META__', json.dumps(meta, ensure_ascii=False).replace('</', '<\\/')) \
         .replace('__PAYLOAD__', '\n'.join(payload))
@@ -369,7 +369,7 @@ PLANTILLA = r'''<!doctype html>
 *{box-sizing:border-box}[hidden]{display:none!important}html,body{height:100%;margin:0}
 body{font-family:__FONT__;color:var(--ink);background:var(--bg);display:grid;grid-template-columns:300px 1fr;overflow:hidden}
 aside{background:var(--navy);color:#e6ebf5;display:flex;flex-direction:column;min-height:0}
-.brand{padding:16px 18px 12px;border-bottom:1px solid #ffffff1a}.brand b{display:block;font-size:16px}.brand span{font-size:11px;color:#aab6d3}
+.brand{padding:16px 18px 12px;border-bottom:1px solid #ffffff1a}.brand b{display:block;font-size:16px}.brand span{font-size:11px;color:#aab6d3}.brand em{display:block;font-style:normal;font-size:12.5px;color:#d5dcec;margin:3px 0 5px}
 .search{padding:12px 14px}.search input{width:100%;padding:9px 12px;border-radius:8px;border:1px solid #ffffff2e;background:#ffffff14;color:#fff;font:inherit;font-size:13px}
 .search input::placeholder{color:#aab6d3}
 nav{overflow:auto;padding:0 8px 16px;flex:1}
@@ -413,8 +413,8 @@ input[type=range]{accent-color:var(--acc);min-width:160px}
 </style></head>
 <body>
 <aside>
-  <div class="brand"><b>__TITULO__</b><span>Generado el __GENERADO__ · funciona sin internet</span></div>
-  <div class="search"><input id="q" type="search" placeholder="Buscar título, responsable o contenido…" aria-label="Buscar"></div>
+  <div class="brand"><b>__TITULO__</b>__SUBTITULO__<span>Generado el __GENERADO__ · funciona sin internet</span></div>
+  <div class="search"__BUSCADOR__><input id="q" type="search" placeholder="Buscar título, responsable o contenido…" aria-label="Buscar"></div>
   <nav id="nav" aria-label="Documentos"></nav>
   <div class="foot" id="foot"></div>
 </aside>
