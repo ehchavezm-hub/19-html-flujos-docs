@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Generador de portal de documentos</title>
+<style>
+/*__FONTFACE__*/
+:root{--navy:#1d2a4a;--ink:#1f2433;--mut:#566079;--line:#dde2ea;--bg:#f4f6fa;--acc:#2e5aa8;--ok:#2f7d32;--warn:#b45309}
+*{box-sizing:border-box}[hidden]{display:none!important}
+body{margin:0;font-family:Figtree,'Segoe UI',system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:var(--navy);color:#fff;padding:22px 28px}header h1{margin:0;font-size:22px}header p{margin:4px 0 0;color:#c6d0e6;font-size:14px}
+main{max-width:880px;margin:24px auto;padding:0 20px;display:grid;gap:16px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px 20px}
+.card h2{margin:0 0 6px;font-size:16px;display:flex;gap:10px;align-items:center}.num{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--acc);color:#fff;font-size:13px}
+.card p{margin:4px 0 12px;color:var(--mut);font-size:14px;line-height:1.45}
+button{font:inherit;font-size:15px;font-weight:600;padding:11px 18px;border-radius:9px;border:1px solid var(--acc);background:var(--acc);color:#fff;cursor:pointer}
+button.sec{background:#fff;color:var(--acc)}button:disabled{opacity:.45;cursor:not-allowed}
+.fila{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+input[type=text]{font:inherit;font-size:15px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;min-width:320px;flex:1}
+.carpeta{font-weight:700;color:var(--navy)}.mut{color:var(--mut);font-size:13px}
+.prog{height:8px;background:#e7ebf2;border-radius:6px;overflow:hidden;margin:10px 0 6px}.prog span{display:block;height:100%;width:0;background:var(--acc);transition:width .2s}
+#log{max-height:240px;overflow:auto;font-size:12.5px;background:#fbfcfe;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--mut)}
+#log .av,.av{color:var(--warn)}
+.fin{border-color:#b7dfbb;background:#f3fbf4}.fin h2{color:var(--ok)}
+.aviso{background:#fff7e0;border:1px solid #f0d98a;border-radius:10px;padding:10px 14px;font-size:13.5px}
+details{font-size:14px;color:var(--mut)}details summary{cursor:pointer;color:var(--ink);font-weight:600}
+table.f{border-collapse:collapse;font-size:13px;margin-top:8px}table.f td{border:1px solid var(--line);padding:5px 8px}
+</style></head>
+<body>
+<header><h1>Generador de portal de documentos</h1>
+<p>Convierte todos los archivos de una carpeta en un solo HTML que funciona sin internet. No instala nada: todo ocurre en este navegador.</p></header>
+<main>
+  <div class="aviso" id="compat" hidden>Este navegador es muy antiguo para el generador. Abre este archivo con Microsoft Edge o Google Chrome actualizados.</div>
+  <section class="card"><h2><span class="num">1</span>Elige la carpeta</h2>
+    <p>Cada subcarpeta será una sección del menú. Se leen .drawio, PDF, HTML, Word (.docx), Excel (.xlsx) y PowerPoint (.pptx). El navegador te pedirá permiso para leer y guardar en esa carpeta.</p>
+    <div class="fila"><button type="button" id="bElegir">Elegir carpeta…</button><span class="mut" id="nota"></span></div>
+    <input type="file" id="entrada" webkitdirectory multiple hidden>
+  </section>
+  <section class="card" id="paso2" hidden><h2><span class="num">2</span>Genera el portal</h2>
+    <p>Carpeta: <span class="carpeta" id="carpeta"></span> · <span id="resumen"></span></p>
+    <div class="fila"><input type="text" id="titulo" placeholder="Título del portal" aria-label="Título del portal">
+      <button type="button" id="bGenerar">Generar portal</button></div>
+    <div class="prog" aria-hidden="true"><span id="barra"></span></div>
+    <div class="mut" id="estado" aria-live="polite"></div>
+    <details style="margin-top:10px"><summary>Opcional: ficha, orden y documentos pendientes (índice)</summary>
+      <p>Crea una plantilla con todos los archivos, complétala en Excel y guárdala en la carpeta como <b>indice.csv</b> o <b>indice.xlsx</b>. Luego vuelve a generar. Las filas sin archivo aparecen como «Pendiente».</p>
+      <button type="button" class="sec" id="bPlantilla">Crear plantilla del índice</button>
+      <table class="f"><tr><td>Archivo</td><td>Titulo</td><td>Seccion</td><td>Orden</td><td>Revision</td><td>Responsable</td><td>Fecha</td><td>Estado</td><td>Nota</td></tr></table>
+    </details>
+  </section>
+  <section class="card fin" id="fin" hidden><h2>Portal generado</h2><p id="finTxt"></p>
+    <div class="fila"><button type="button" id="bAbrir">Abrir el portal</button><span class="mut">Puedes cerrar esta página. Para actualizar el portal, vuelve a generarlo.</span></div></section>
+  <section class="card"><h2>Registro</h2><div id="log" aria-live="polite"><div>Elige una carpeta para empezar.</div></div></section>
+  <p class="mut">Formatos antiguos (.doc, .xls, .ppt) quedan solo para descargar: guárdalos como .docx/.xlsx/.pptx para verlos en el portal. Se ignoran archivos temporales (~$…) y carpetas que empiezan con _ o «.».</p>
+</main>
+<script>
+/*__DATOS__*/
+</script>
+<script>
+/*__JS__*/
+</script>
+</body></html>

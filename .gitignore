@@ -1,0 +1,5 @@
+__pycache__/
+* - Portal.html
+indice_plantilla.csv
+# Los documentos (drawio, PDF, Office) viven en Google Drive o en la laptop, no en este repositorio
+documentos/
