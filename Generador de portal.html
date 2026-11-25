@@ -2456,7 +2456,7 @@ async function leerConfig(file) {
   const cfg = {titulo: '', subtitulo: '', buscador: true, reglas: [], excepciones: [], archivo: file.name}; let enDocs = false;
   for (const r of todos(h.doc, 'row')) {
     const v = {}; for (const c of hijos(r, 'c')) { const [, cc] = colNum(at(c, 'r')); v[cc] = valorCelda(c, X).txt.trim(); }
-    const a = v[1] || '', b = v[2] || '', k = nrm(a).replace(/:$/, '');
+    const a = v[1] || '', b = v[2] || '', c = v[3] || '', k = nrm(a).replace(/:$/, '');
     if (!a && !b) continue;
     if (k.startsWith('excepcion')) { if (b) cfg.excepciones.push(b); continue; }
     if (k === 'titulo') { cfg.titulo = b; continue; }
@@ -2464,7 +2464,8 @@ async function leerConfig(file) {
     if (k === 'buscador') { cfg.buscador = !!b && !/^(no|ninguno|sin|oculto|0)$/.test(nrm(b)); continue; }
     if (k.startsWith('documentos') && !b) { enDocs = true; continue; }
     if (k.startsWith('menu')) continue;
-    if (enDocs && a && b) cfg.reglas.push({seccion: nombreSeccion(a), patron: b});
+    // columna C (opcional): nombre del archivo; si está, manda sobre la búsqueda por título
+    if (enDocs && a && (b || c)) cfg.reglas.push({seccion: nombreSeccion(a), patron: b || c, archivo: c});
   }
   return cfg;
 }
@@ -2495,6 +2496,12 @@ async function construir(entradas, nombreCarpeta, opciones) {
     const filas = [], asignados = new Set(), vistos = new Set(); let orden = 0;
     for (const rg of cfg.reglas) {
       const clave = rg.seccion + '|' + nrm(rg.patron); if (vistos.has(clave)) continue; vistos.add(clave);
+      if (rg.archivo) {                 // archivo indicado en la columna C
+        let e = validas.find(e => !asignados.has(e) && coincide(rg.archivo, e.ruta, false)) || validas.find(e => !asignados.has(e) && coincide(rg.archivo, e.ruta, true));
+        if (!e) { filas.push({archivo: '', titulo: rg.patron, seccion: rg.seccion, orden: String(++orden), estado: 'Pendiente'}); aviso('Configuración: el archivo «' + rg.archivo + '» (columna C) no está en la carpeta; «' + rg.patron + '» se muestra como pendiente.'); continue; }
+        asignados.add(e); const m = meta.get(nrm(e.ruta.split('/').pop()).replace(/\.[^.]+$/, '')) || {};
+        filas.push(Object.assign({}, m, {titulo: rg.patron !== rg.archivo ? rg.patron : (m.titulo || ''), archivo: e.ruta, seccion: rg.seccion, orden: String(++orden)})); continue;
+      }
       let hits = validas.filter(e => !asignados.has(e) && coincide(rg.patron, e.ruta, false));
       if (!hits.length && !nrm(rg.patron).includes('...')) hits = validas.filter(e => !asignados.has(e) && coincide(rg.patron, e.ruta, true));
       let porNombre = true;
