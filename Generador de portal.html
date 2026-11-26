@@ -1531,7 +1531,7 @@ const PDFX = (() => {
     const mover = (x, y) => { cx = lx += x; cy = ly += y; };
     const pila = []; let ruta = '';
     // geometría de la ruta actual (para reconocer tablas, reglas, cajas y dibujos)
-    const nuevoGeo = () => ({rects: [], segs: [], curva: false, bb: [1e9, 1e9, -1e9, -1e9], pt: null, ini: null});
+    const nuevoGeo = () => ({rects: [], segs: [], subs: [], curva: false, bb: [1e9, 1e9, -1e9, -1e9], pt: null, ini: null});
     let geo = nuevoGeo();
     const D = (x, y) => { const p = ap(st.ctm, x, y); const b = geo.bb; if (p[0] < b[0]) b[0] = p[0]; if (p[1] < b[1]) b[1] = p[1]; if (p[0] > b[2]) b[2] = p[0]; if (p[1] > b[3]) b[3] = p[1]; return p; };
     const P = (x, y) => { const p = D(x, y); return r1(p[0]) + ' ' + r1(p[1]); };
@@ -1607,8 +1607,8 @@ const PDFX = (() => {
             if (op === OPS.rectangle) { const x = c[j++], y = c[j++], w = c[j++], h = c[j++]; ruta += 'M' + P(x, y) + 'L' + P(x + w, y) + 'L' + P(x + w, y + h) + 'L' + P(x, y + h) + 'Z'; cx = x; cy = y;
               const p = ap(st.ctm, x, y), q = ap(st.ctm, x + w, y + h);
               if (recto()) geo.rects.push([Math.min(p[0], q[0]), Math.min(p[1], q[1]), Math.max(p[0], q[0]), Math.max(p[1], q[1])]); else geo.curva = true; }
-            else if (op === OPS.moveTo) { cx = c[j++]; cy = c[j++]; ruta += 'M' + P(cx, cy); geo.pt = geo.ini = ap(st.ctm, cx, cy); }
-            else if (op === OPS.lineTo) { cx = c[j++]; cy = c[j++]; ruta += 'L' + P(cx, cy); const q = ap(st.ctm, cx, cy); if (geo.pt) geo.segs.push([geo.pt[0], geo.pt[1], q[0], q[1]]); geo.pt = q; }
+            else if (op === OPS.moveTo) { cx = c[j++]; cy = c[j++]; ruta += 'M' + P(cx, cy); geo.pt = geo.ini = ap(st.ctm, cx, cy); geo.subs.push({p: [geo.pt], ok: true}); }
+            else if (op === OPS.lineTo) { cx = c[j++]; cy = c[j++]; ruta += 'L' + P(cx, cy); const q = ap(st.ctm, cx, cy); if (geo.pt) { geo.segs.push([geo.pt[0], geo.pt[1], q[0], q[1]]); const sb = geo.subs[geo.subs.length - 1]; if (sb) { if (Math.abs(geo.pt[0] - q[0]) > 0.6 && Math.abs(geo.pt[1] - q[1]) > 0.6) sb.ok = false; sb.p.push(q); } } geo.pt = q; }
             else if (op === OPS.curveTo) { geo.curva = true; ruta += 'C' + P(c[j], c[j + 1]) + ' ' + P(c[j + 2], c[j + 3]) + ' ' + P(c[j + 4], c[j + 5]); cx = c[j + 4]; cy = c[j + 5]; j += 6; }
             else if (op === OPS.curveTo2) { geo.curva = true; ruta += 'C' + P(cx, cy) + ' ' + P(c[j], c[j + 1]) + ' ' + P(c[j + 2], c[j + 3]); cx = c[j + 2]; cy = c[j + 3]; j += 4; }
             else if (op === OPS.curveTo3) { geo.curva = true; ruta += 'C' + P(c[j], c[j + 1]) + ' ' + P(c[j + 2], c[j + 3]) + ' ' + P(c[j + 2], c[j + 3]); cx = c[j + 2]; cy = c[j + 3]; j += 4; }
@@ -1699,7 +1699,8 @@ const PDFX = (() => {
   function graficos(els) {
     const cajas = [];
     for (const e of els) if (e.t === 'p') for (const q of e.g) if (q.fill && !esBlanco(q.fill) && !q.g.curva)
-      for (const r of (q.g.rects.length ? q.g.rects : (q.g.segs.length >= 3 && q.g.segs.length <= 5 ? [q.g.bb] : []))) { const w = r[2] - r[0], h = r[3] - r[1]; if (w > 2.2 && h > 2.2) cajas.push({r, w, h, c: q.fill}); }   // las líneas (rectángulos finos) no son barras
+      // rectángulos: los del operador «re» o subtrayectos de 4 lados rectos (Excel dibuja así cada barra, a veces todas en un mismo trayecto)
+      for (const r of (q.g.rects.length ? q.g.rects : q.g.subs.filter(sb => sb.ok && sb.p.length >= 4 && sb.p.length <= 6).map(sb => [Math.min(...sb.p.map(p => p[0])), Math.min(...sb.p.map(p => p[1])), Math.max(...sb.p.map(p => p[0])), Math.max(...sb.p.map(p => p[1]))]))) { const w = r[2] - r[0], h = r[3] - r[1]; if (w > 2.2 && h > 2.2) cajas.push({r, w, h, c: q.fill}); }   // las líneas (rectángulos finos) no son barras
     const zonas = [];
     const agrupar = (clave) => { const m = new Map(); for (const c of cajas) { const k = clave(c); if (k == null) continue; if (!m.has(k)) m.set(k, []); m.get(k).push(c); } return [...m.values()]; };
     const cen = els.filter(e => e.t === 't' && !e.ang).map(e => [e.x + e.len / 2, e.y - e.sz * 0.3]);
