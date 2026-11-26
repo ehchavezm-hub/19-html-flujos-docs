@@ -385,9 +385,9 @@ aside{background:var(--azul);color:var(--side-ink);display:flex;flex-direction:c
 .search input{width:100%;padding:7px 10px 7px 30px;border-radius:var(--r);border:1px solid #ffffff2b;background:#ffffff14;color:#fff;font:inherit;font-size:13px;transition:border-color .15s,background-color .15s}
 .search input:hover{border-color:#ffffff4d}.search input:focus{outline:none;border-color:#f6a26b;background:#ffffff1f}.search input::placeholder{color:var(--side-mut)}
 nav{overflow:auto;padding:0 6px 12px;flex:1;scrollbar-width:thin;scrollbar-color:#ffffff33 transparent;overscroll-behavior:contain}
-.sec{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:10px 8px 2px;padding-top:8px;border-top:1px solid #ffffff1a;font-size:11.5px;font-weight:500;color:#9fc0e0}
+.sec{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:14px 8px 2px;padding-top:0;font-size:11.5px;font-weight:500;color:#9fc0e0}
 nav .sec:first-child{border-top:0;margin-top:4px;padding-top:2px}
-.sec i{font-style:normal;font-weight:500;font-size:10.5px;color:var(--azul);background:#9fc0e0;border-radius:8px;padding:0 6px;line-height:16px;font-variant-numeric:tabular-nums}
+.sec i{font-style:normal;font-weight:400;font-size:11px;color:#7f97ae;font-variant-numeric:tabular-nums}
 nav a{position:relative;display:flex;gap:8px;align-items:baseline;padding:3px 8px 3px 10px;border-radius:4px;color:var(--side-ink);text-decoration:none;font-size:12.75px;line-height:1.3;transition:background-color .12s}
 nav a:hover{background:#ffffff14;color:#fff}
 nav a.on{background:#ffffff26;color:#fff;font-weight:500}
@@ -396,13 +396,13 @@ nav a .tt{flex:1;min-width:0}
 .dot{flex:none;width:7px;height:7px;border-radius:1px;background:var(--c,#8a949a);transform:translateY(-1px)}
 nav a.pend{color:var(--side-mut)}nav a.pend .dot{background:transparent;box-shadow:inset 0 0 0 1.5px #e7b45a}
 nav a .sub{flex:none;font-size:10px;font-weight:500;color:#e7b45a}
-.foot{display:flex;gap:14px;font-size:11.5px;color:var(--side-mut);padding:9px 16px;border-top:1px solid #ffffff1a}.foot b{color:#fff;font-weight:500;font-variant-numeric:tabular-nums}
+.foot{display:flex;gap:14px;font-size:11.5px;color:var(--side-mut);padding:9px 16px}.foot b{color:#fff;font-weight:500;font-variant-numeric:tabular-nums}
 .empty{padding:14px 10px;color:var(--side-mut);font-size:13px}
 /* ---- área de trabajo */
 main{display:flex;flex-direction:column;min-width:0;min-height:0}
 header.vh{background:var(--papel);border-bottom:1px solid var(--linea);padding:8px 16px;display:flex;gap:12px;align-items:center}
 /* rótulo compacto: el título en la franja azul y los datos del plano en la misma línea */
-.rotulo{flex:1;min-width:0;display:flex;align-items:stretch;border:1.5px solid var(--azul);border-radius:3px;background:var(--papel);overflow:hidden;height:46px}
+.rotulo{flex:1;min-width:0;display:flex;align-items:stretch;border:1px solid var(--linea);border-radius:3px;background:var(--papel);overflow:hidden;height:46px}
 .rotulo>div{padding:5px 12px;border-left:1px solid var(--linea2);min-width:0;display:flex;flex-direction:column;justify-content:center;flex:none}
 .rotulo small{display:block;font-size:10.5px;color:var(--mut);line-height:1.2}
 .rotulo b{display:block;font-size:12.5px;font-weight:400;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
@@ -420,34 +420,34 @@ button:hover,.btn:hover{border-color:var(--azul2);background:var(--azul-suave)}b
 #bDesc,#bDesc2{background:var(--acc);border-color:var(--acc);color:#fff}#bDesc:hover,#bDesc2:hover{background:var(--acc-txt);border-color:var(--acc-txt)}
 button[aria-pressed=true]{background:var(--acc);color:#fff;border-color:var(--acc)}
 .bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:6px 16px;background:var(--azul-suave);border-bottom:1px solid var(--linea2);font-size:12.5px;color:var(--mut)}
-.bar .grp{display:flex;gap:4px;align-items:center;padding-right:12px;border-right:1px solid var(--linea2)}.bar .grp:last-of-type{border-right:0}
+.bar .grp{display:flex;gap:4px;align-items:center;padding-right:12px}.bar .grp:last-of-type{border-right:0}
 .bar button{min-height:30px;padding:4px 10px;font-size:12.5px;font-weight:500}#zl{min-width:46px;text-align:center;font-variant-numeric:tabular-nums}
 .tabs button[aria-selected=true]{background:var(--azul);color:#fff;border-color:var(--azul)}
 .note{margin:12px 24px 0;padding:9px 12px;background:var(--acc-suave);border-left:3px solid var(--acc);border-radius:2px;font-size:12.5px;color:#6b2c06}
-.canvas{flex:1;overflow:auto;margin:10px 16px 14px;background:var(--papel);border:1px solid var(--linea);border-radius:2px;cursor:grab;position:relative;min-height:0;overscroll-behavior:contain}
+.canvas{flex:1;overflow:auto;margin:10px 16px 14px;background:var(--papel);border:1px solid var(--linea2);border-radius:2px;cursor:grab;position:relative;min-height:0;overscroll-behavior:contain}
 .canvas.drag{cursor:grabbing}.stage{transform-origin:0 0;width:max-content}.stage svg{display:block}
-.frame{flex:1;margin:10px 16px 14px;border:1px solid var(--linea);border-radius:2px;overflow:auto;background:#e3e6e8;min-height:0}
+.frame{flex:1;margin:10px 16px 14px;border:1px solid var(--linea2);border-radius:2px;overflow:auto;background:#e3e6e8;min-height:0}
 .frame iframe{border:0;width:100%;height:100%;display:block;background:#fff}.frame .zoomwrap{transform-origin:0 0;height:100%}
 /* ---- inicio: registro de documentos */
 .home{padding:30px 36px 48px;overflow:auto;max-width:1180px}
 .hero .proy{display:inline-block;font-size:13px;font-weight:500;color:#fff;background:var(--acc);border-radius:3px;padding:3px 9px;margin-bottom:10px}
 .hero h1{margin:0;color:var(--azul);font-size:30px;letter-spacing:-.025em;line-height:1.12;font-weight:600;text-wrap:balance}
 .hero p{margin:8px 0 0;color:var(--tinta2);font-size:15px;max-width:68ch;text-wrap:pretty}.hero p b{font-weight:500;font-variant-numeric:tabular-nums}
-.grupo{margin-top:30px}
-.grupo h2{display:flex;align-items:baseline;gap:10px;font-size:16px;font-weight:600;margin:0 0 8px;letter-spacing:-.01em;color:var(--azul);padding-left:10px;border-left:4px solid var(--acc)}
+.grupo{margin-top:34px}
+.grupo h2{display:flex;align-items:baseline;gap:10px;font-size:16px;font-weight:600;margin:0 0 8px;letter-spacing:-.01em;color:var(--azul);padding-left:9px;border-left:3px solid var(--acc)}
 .grupo h2 i{font-style:normal;font-size:12.5px;font-weight:400;color:var(--mut);font-variant-numeric:tabular-nums}
-table.reg{width:100%;border-collapse:collapse;background:var(--papel);border:1.5px solid var(--azul);font-size:13.5px}
-.reg th{text-align:left;font-size:11.5px;font-weight:500;color:#fff;padding:7px 12px;background:var(--azul);white-space:nowrap}
+table.reg{width:100%;border-collapse:collapse;background:var(--papel);font-size:13.5px;border-radius:4px;overflow:hidden}
+.reg th{text-align:left;font-size:11px;font-weight:500;color:#fff;padding:6px 12px;background:var(--azul);white-space:nowrap}
 .reg td{padding:9px 12px;border-bottom:1px solid var(--linea2);vertical-align:top;font-variant-numeric:tabular-nums}
 .reg tr:last-child td{border-bottom:0}
 .reg td.n{width:44px;color:var(--mut)}.reg td.t{width:120px;white-space:nowrap}.reg td.r{width:64px}.reg td.f{width:104px;white-space:nowrap}.reg td.e{width:120px}
 .reg a{color:var(--tinta);text-decoration:none;font-weight:400;text-wrap:pretty}
 .reg tbody tr{position:relative;cursor:pointer;transition:background-color .1s}
 .reg a::after{content:"";position:absolute;inset:0}
-.reg tbody tr:nth-child(even){background:#f5f8fb}.reg tbody tr:hover{background:var(--acc-suave)}.reg tbody tr:hover a{text-decoration:underline;text-decoration-color:var(--acc);text-underline-offset:3px}
+.reg tbody tr:hover{background:var(--acc-suave)}.reg tbody tr:hover a{text-decoration:underline;text-decoration-color:var(--acc);text-underline-offset:3px}
 .reg tbody tr:focus-within{outline:2px solid var(--acc);outline-offset:-2px}.reg a:focus-visible{outline:0}
 .reg tr.pend a{color:var(--mut);font-weight:400}
-.st{display:inline-block;font-size:11.5px;font-weight:500;color:var(--ok);background:var(--ok-suave);border-radius:10px;padding:2px 9px}.st.p{color:var(--pend);background:var(--pend-suave)}.st.p::before{content:"";display:inline-block;width:6px;height:6px;border:1.5px solid currentColor;border-radius:50%;margin-right:6px;vertical-align:1px}
+.st{display:inline-block;font-size:11.5px;font-weight:500;color:var(--ok);background:var(--ok-suave);border-radius:10px;padding:2px 9px}.st.p{color:var(--pend);background:var(--pend-suave)}
 .pendbox{margin:56px auto;max-width:480px;padding:22px 24px;border:1.5px dashed var(--linea);background:var(--papel);color:var(--tinta2);border-radius:2px}.pendbox h2{color:var(--tinta);font-size:18px;font-weight:500;margin:0 0 6px}
 mark{background:#ffd79a;padding:0 1px}
 [data-motion-item].fut{opacity:0;transition:opacity .25s}[data-motion-item]{transition:opacity .25s}
@@ -529,9 +529,9 @@ function inicio(){
   let n=0;
   for(const sec of secs){
     const ms=META.filter(x=>x.seccion===sec);
-    h+='<section class="grupo"><h2>'+e(sec)+'<i>'+ms.length+'</i></h2><table class="reg"><thead><tr><th>N.º</th><th>Documento</th><th class="t">Tipo</th><th>Rev.</th><th class="f">Fecha</th><th>Estado</th></tr></thead><tbody>';
+    h+='<section class="grupo"><h2>'+e(sec)+'<i>'+ms.length+'</i></h2><table class="reg"><thead><tr><th>Documento</th><th class="t">Tipo</th><th>Rev.</th><th class="f">Fecha</th><th>Estado</th></tr></thead><tbody>';
     for(const m of ms){ n++; const pend=m.tipo==='pendiente';
-      h+='<tr class="'+(pend?'pend':'')+'"><td class="n">'+n+'</td><td><a href="#'+m.id+'">'+e(m.titulo)+'</a></td><td class="t">'+(m.tipo in OK?'<span class="tipo" style="--c:'+COL[m.tipo]+'">'+NOM[m.tipo]+'</span>':'—')+'</td><td class="r">'+e(m.revision||'—')+'</td><td class="f">'+e(m.fecha||'—')+'</td><td class="e"><span class="st'+(pend?' p':'')+'">'+e(m.estado||(pend?'Pendiente':m.tipo==='error'?'Error':'Disponible'))+'</span></td></tr>';
+      h+='<tr class="'+(pend?'pend':'')+'"><td><a href="#'+m.id+'">'+e(m.titulo)+'</a></td><td class="t">'+(m.tipo in OK?'<span class="tipo" style="--c:'+COL[m.tipo]+'">'+NOM[m.tipo]+'</span>':'—')+'</td><td class="r">'+e(m.revision||'—')+'</td><td class="f">'+e(m.fecha||'—')+'</td><td class="e"><span class="st'+(pend?' p':'')+'">'+e(m.estado||(pend?'Pendiente':m.tipo==='error'?'Error':'Disponible'))+'</span></td></tr>';
     }
     h+='</tbody></table></section>';
   }
