@@ -47,6 +47,42 @@ const MD = (() => {
       size -= 0.5;
     }
   }
+  // ------------------------------------------------------------------ etiquetas HTML (como las dibuja draw.io)
+  // Las etiquetas con formato (listas, negritas, saltos, alineación) se dibujan como HTML dentro del SVG (foreignObject),
+  // igual que draw.io: respetan align, verticalAlign, fontSize, fontColor, fontStyle y spacing del estilo.
+  const RICO = /<(ul|ol|li|b|strong|i|em|u|font|span|div|p|br|sub|sup|table)\b/i;
+  const PERMITIDAS = new Set(['B', 'STRONG', 'I', 'EM', 'U', 'UL', 'OL', 'LI', 'DIV', 'P', 'BR', 'SPAN', 'FONT', 'SUB', 'SUP', 'STRIKE', 'S', 'TABLE', 'TBODY', 'TR', 'TD', 'TH', 'HR']);
+  function limpiarHtml(v) {
+    const d = new DOMParser().parseFromString('<div>' + String(v || '').split(/%3CmxGraphModel|<mxGraphModel/)[0] + '</div>', 'text/html');
+    const paso = n => { for (const c of [...n.childNodes]) {
+      if (c.nodeType === 1) {
+        if (!PERMITIDAS.has(c.tagName)) { if (['SCRIPT', 'STYLE', 'IFRAME', 'OBJECT'].includes(c.tagName)) { c.remove(); continue; } paso(c); c.replaceWith(...c.childNodes); continue; }
+        const st = c.getAttribute('style') || '', col = c.getAttribute('color'), sz = c.getAttribute('size');
+        for (const a of [...c.attributes]) c.removeAttribute(a.name);
+        // se quitan colores «light-dark(...)» y fondos de draw.io; se conservan tamaño, negrita, color simple y alineación
+        const ok = st.split(';').map(x => x.trim()).filter(x => /^(font-size|font-weight|font-style|text-decoration|text-align|color|padding-left|margin-left)\s*:/i.test(x) && !/light-dark|var\(/.test(x));
+        if (col && /^#?[0-9a-z]+$/i.test(col)) ok.push('color:' + col);
+        if (sz) ok.push('font-size:' + ({1: '0.63em', 2: '0.82em', 3: '1em', 4: '1.13em', 5: '1.5em', 6: '2em', 7: '3em'}[sz] || '1em'));
+        if (ok.length) c.setAttribute('style', ok.map(x => x.replace(/(\d+(?:\.\d+)?)px/g, (m, n) => (n * S) + 'px')).join(';'));
+        paso(c);
+      } else if (c.nodeType !== 3) c.remove(); } };
+    paso(d.body.firstChild); return d.body.firstChild.innerHTML;
+  }
+  function etiquetaHtml(x, y, w, h, s, valor) {
+    const html = s.html === '1' ? limpiarHtml(valor) : esc(valor).replace(/\n/g, '<br>');
+    const fs = (parseFloat(s.fontSize) || 11) * S, fst = parseInt(s.fontStyle || '0') || 0;
+    const al = s.align || 'center', va = s.verticalAlign || 'middle';
+    const sp = (parseFloat(s.spacing ?? 2) || 0) * S, spL = sp + (parseFloat(s.spacingLeft) || 0) * S, spR = sp + (parseFloat(s.spacingRight) || 0) * S,
+      spT = sp + (parseFloat(s.spacingTop) || 0) * S, spB = sp + (parseFloat(s.spacingBottom) || 0) * S;
+    const col = s.fontColor && /^#[0-9a-f]{3,8}$/i.test(s.fontColor) ? s.fontColor : INK;
+    const estilo = 'display:flex;box-sizing:border-box;width:100%;height:100%;padding:' + [spT, spR, spB, spL].map(e1).join('px ') + 'px;' +
+      'align-items:' + ({top: 'flex-start', bottom: 'flex-end'}[va] || 'center') + ';justify-content:' + ({left: 'flex-start', right: 'flex-end'}[al] || 'center') + ';' +
+      'text-align:' + al + ';font-family:' + F_SANS.replace(/"/g, "'") + ';font-size:' + g(fs) + 'px;line-height:1.2;color:' + col + ';' +
+      (fst & 1 ? 'font-weight:700;' : '') + (fst & 2 ? 'font-style:italic;' : '') + (fst & 4 ? 'text-decoration:underline;' : '') +
+      (s.whiteSpace === 'wrap' ? 'overflow-wrap:break-word;' : 'white-space:nowrap;');
+    return '<foreignObject x="' + e1(x) + '" y="' + e1(y) + '" width="' + e1(w) + '" height="' + e1(h) + '" style="overflow:visible"><div xmlns="http://www.w3.org/1999/xhtml" style="' + estilo + '">' +
+      '<div style="max-width:100%">' + html.replace(/<ul>/gi, '<ul style="margin:0;padding-left:' + g(14 * S) + 'px;text-align:left">').replace(/<ol>/gi, '<ol style="margin:0;padding-left:' + g(14 * S) + 'px;text-align:left">') + '</div></div></foreignObject>';
+  }
   // ------------------------------------------------------------------ lectura
   function Diagram(model) {
     const cells = new Map(), st = new Map();
@@ -208,7 +244,7 @@ const MD = (() => {
     const D = Diagram(model);
     const [verts, kinds, group, elabels] = build(D);
     const B = new Map(); for (const i of verts) { const [x, y, w, h] = D.box(i); B.set(i, [x * S, y * S, w * S, h * S]); }
-    const content = verts.filter(i => kinds.get(i) !== 'title');
+    const content = verts.slice();   // el título también se dibuja, en su lugar y con su recuadro
     const xs = [...content.map(i => B.get(i)[0]), ...content.map(i => B.get(i)[0] + B.get(i)[2])];
     const ys = [...content.map(i => B.get(i)[1]), ...content.map(i => B.get(i)[1] + B.get(i)[3])];
     const E = [];
@@ -301,8 +337,9 @@ const MD = (() => {
       }
     }
     for (const i of content) {
-      if (kinds.get(i) !== 'band') continue; const [x, y, w, h] = B.get(i);
-      o.push('<rect x="' + e1(x) + '" y="' + e1(y) + '" width="' + e1(w) + '" height="' + e1(h) + '" rx="4" fill="#fdf5dc" stroke="#d6b656"/>');
+      if (kinds.get(i) !== 'band') continue; const [x, y, w, h] = B.get(i); const s0 = D.st.get(i);
+      const bf = /^#[0-9a-f]{6}$/i.test(s0.fillColor || '') ? s0.fillColor : '#fdf5dc', bs = /^#[0-9a-f]{6}$/i.test(s0.strokeColor || '') ? s0.strokeColor : '#d6b656';
+      o.push('<rect x="' + e1(x) + '" y="' + e1(y) + '" width="' + e1(w) + '" height="' + e1(h) + '" rx="4" fill="' + bf + '" stroke="' + bs + '"/>');
       const t = labelLines(D.cells.get(i).value); textos.push(...t);
       if (h > w * 1.6) { const [lines, fs] = fit(t, h - 16, w - 8, 10, 7, 1.18, MONO); const cx = x + w / 2, cy = y + h / 2, off = -(lines.length - 1) * fs * 0.6;
         lines.forEach((ln, k) => { const xx = cx + fs * 0.35 + off + k * fs * 1.2;
@@ -336,7 +373,14 @@ const MD = (() => {
       const lines = labelLines(D.cells.get(i).value); textos.push(...lines);
       const pal = group.get(i) ? palette(labelLines(D.cells.get(group.get(i)).value).join(' ')) : null;
       const stp = stepOf.get(i); const gq = [];
-      if (k === 'text') {
+      if (k === 'text' || k === 'title') {
+        const fill0 = (s.fillColor || 'none').toLowerCase(), st0 = (s.strokeColor || 'none').toLowerCase();
+        const borde = st0 !== 'none' ? (st0 === 'default' ? INK : st0) : null;
+        if (borde || fill0 !== 'none') gq.push('<rect x="' + e1(x) + '" y="' + e1(y) + '" width="' + e1(w) + '" height="' + e1(h) + '"' + (s.rounded === '1' ? ' rx="6"' : '') + ' fill="' + (fill0 === 'none' ? 'none' : fill0) + '" stroke="' + (borde || 'none') + '" stroke-width="' + g(Math.max(parseFloat(s.strokeWidth || 1) || 1, 0.6)) + '"' + (s.dashed === '1' ? ' stroke-dasharray="' + (s.dashPattern ? s.dashPattern.split(' ').map(v => +v * 0.35).join(' ') : '5 4') + '"' : '') + '/>');
+        gq.push(etiquetaHtml(x, y, w, h, s, D.cells.get(i).value || ''));
+        o.push(gq.join('')); continue;
+      }
+      if (false) {
         const long_ = lines.reduce((a, l) => a + l.length, 0) > 40; const em = long_ ? SANS : MONO;
         const [wl, fs] = fit(lines, Math.max(w - 4, 20), Math.max(h, 12), long_ ? 10 : 8.5, 7, 1.18, em);
         const left = s.align === 'left';
@@ -392,6 +436,8 @@ const MD = (() => {
         else gq.push('<rect class="nb" x="' + e1(x) + '" y="' + e1(y) + '" width="' + e1(w) + '" height="' + e1(h) + '" rx="' + (s.rounded === '1' || pal ? 6 : 0) + '" fill="' + fill + '" stroke="' + ink + '" stroke-width="' + g(sw) + '"' + dash + '/>');
         const left = s.align === 'left'; const [wl, fs] = fit(lines, w - 14, h - 6, 11.5, 7);
         let ty = (left && (s.verticalAlign || 'middle') === 'top') ? y + 8 + fs : cy + fs * 0.35 - (wl.length - 1) * fs * 0.6;
+        const rico = s.html === '1' && /<(ul|ol|li|b|strong|font|table)\b/i.test(D.cells.get(i).value || '');
+        if (rico) { gq.push(etiquetaHtml(x, y, w, h, s, D.cells.get(i).value || '')); wl.length = 0; }
         for (const ln of wl) {
           if (left) gq.push('<text x="' + e1(x + 8) + '" y="' + e1(ty) + '" font-family="' + F_SANS + '" font-size="' + g(fs) + '" font-weight="500" fill="' + tcol + '">' + esc(ln) + '</text>');
           else gq.push('<text x="' + e1(cx) + '" y="' + e1(ty) + '" text-anchor="middle" font-family="' + F_SANS + '" font-size="' + g(fs) + '" font-weight="600" fill="' + tcol + '">' + esc(ln) + '</text>');
