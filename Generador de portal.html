@@ -1469,7 +1469,7 @@ const OX = (() => {
 const PDFX = (() => {
   const OPS = {setLineWidth: 2, setDash: 6, setGState: 9, save: 10, restore: 11, transform: 12, moveTo: 13, lineTo: 14, curveTo: 15, curveTo2: 16, curveTo3: 17,
     closePath: 18, rectangle: 19, stroke: 20, closeStroke: 21, fill: 22, eoFill: 23, fillStroke: 24, eoFillStroke: 25, closeFillStroke: 26, closeEOFillStroke: 27,
-    endPath: 28, beginText: 31, setCharSpacing: 33, setWordSpacing: 34, setHScale: 35, setLeading: 36, setFont: 37, setTextRenderingMode: 38, setTextRise: 39,
+    endPath: 28, clip: 29, eoClip: 30, beginText: 31, setCharSpacing: 33, setWordSpacing: 34, setHScale: 35, setLeading: 36, setFont: 37, setTextRenderingMode: 38, setTextRise: 39,
     moveText: 40, setLeadingMoveText: 41, setTextMatrix: 42, nextLine: 43, showText: 44, showSpacedText: 45, nextLineShowText: 46, nextLineSetSpacingShowText: 47,
     setStrokeColorN: 53, setFillColorN: 55, setStrokeRGBColor: 58, setFillRGBColor: 59, paintFormXObjectBegin: 74, paintFormXObjectEnd: 75, beginGroup: 76, endGroup: 77,
     paintImageMaskXObject: 83, paintImageXObject: 85, paintInlineImageXObject: 86, paintImageXObjectRepeat: 88, paintSolidColorImageMask: 90, constructPath: 91};
@@ -1571,8 +1571,11 @@ const PDFX = (() => {
         const v = ap(M, 0, st.size); const o = ap(M, 0, 0); const sz = Math.hypot(v[0] - o[0], v[1] - o[1]);
         if (sz < 0.5) continue;
         const ang = Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI; const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
-        const txt = s.s.replace(/\s+$/, '');
-        els.push({t: 't', cls, sz: r1(sz), x: r1(a[0]), y: r1(a[1]), ang: Math.abs(ang) < 0.3 ? 0 : r1(ang), len: r1(len * (txt.length / Math.max(s.s.length, 1))), s: txt,
+        let txt = s.s.replace(/\s+$/, ''); let largo = len * (txt.length / Math.max(s.s.length, 1));
+        // texto horizontal que se sale de su recorte: se corta como en el PDF
+        if (st.clip && Math.abs(ang) < 0.3 && largo > 0) { const c = st.clip; if (a[1] < c[1] - sz || a[1] > c[3] + sz * 0.5 || a[0] > c[2] - 0.5) continue;
+          if (a[0] + largo > c[2] + 1) { const n = Math.max(0, Math.floor(txt.length * (c[2] - a[0]) / largo)); if (!n) continue; txt = txt.slice(0, n).replace(/\s+$/, ''); largo = largo * txt.length / s.s.replace(/\s+$/, '').length; } }
+        els.push({t: 't', cls, sz: r1(sz), x: r1(a[0]), y: r1(a[1]), ang: Math.abs(ang) < 0.3 ? 0 : r1(ang), len: r1(largo), s: txt,
           col: color, op: st.fa < 1 ? st.fa : 1});
         textoPag.push(txt);
       }
@@ -1624,6 +1627,9 @@ const PDFX = (() => {
         case OPS.closeFillStroke: ruta += 'Z'; emitirRuta(true, true, false); break;
         case OPS.closeEOFillStroke: ruta += 'Z'; emitirRuta(true, true, true); break;
         case OPS.endPath: ruta = ''; geo = nuevoGeo(); break;
+        // recorte rectangular (Excel recorta así el texto de cada celda): se guarda para cortar los textos que se salen
+        case OPS.clip: case OPS.eoClip: if (geo.rects.length === 1 && !geo.curva && !geo.segs.length) { const r = geo.rects[0];
+            st.clip = st.clip ? [Math.max(st.clip[0], r[0]), Math.max(st.clip[1], r[1]), Math.min(st.clip[2], r[2]), Math.min(st.clip[3], r[3])] : r.slice(); } break;
         case OPS.beginText: tm = [1, 0, 0, 1, 0, 0]; lx = ly = cx = cy = 0; break;
         case OPS.setCharSpacing: st.tc = a[0]; break;
         case OPS.setWordSpacing: st.tw = a[0]; break;
@@ -1719,7 +1725,20 @@ const PDFX = (() => {
       if (z) { z[0] = Math.min(z[0], bb[0]); z[1] = Math.min(z[1], bb[1]); z[2] = Math.max(z[2], bb[2]); z[3] = Math.max(z[3], bb[3]); } else zonas.push(bb);
     }
     // cada zona se amplía a los ejes, etiquetas y el marco del gráfico
-    return zonas.map(z => [z[0] - 60, z[1] - 40, z[2] + 40, z[3] + 70]);
+    const res = zonas.map(z => [z[0] - 60, z[1] - 40, z[2] + 40, z[3] + 70]);
+    // leyendas: 4 o más muestras de color pequeñas y sueltas (no se tocan entre sí) en una franja de pocas filas.
+    // Su texto suele ir recortado por la celda; reflujarlo lo desordena, así que la franja se conserva como dibujo.
+    const toca = (a, b) => a !== b && a.r[0] <= b.r[2] + 1.5 && b.r[0] <= a.r[2] + 1.5 && a.r[1] <= b.r[3] + 1.5 && b.r[1] <= a.r[3] + 1.5;
+    const mues = cajas.filter(c => c.w >= 5 && c.h >= 5 && c.w <= 45 && c.h <= 30 && c.w / c.h < 4 && c.h / c.w < 4).filter(c => !cajas.some(o => o !== c && toca(c, o) && !(o.r[0] >= c.r[0] - 0.5 && o.r[2] <= c.r[2] + 0.5 && o.r[1] >= c.r[1] - 0.5 && o.r[3] <= c.r[3] + 0.5) && !(c.r[0] >= o.r[0] - 0.5 && c.r[2] <= o.r[2] + 0.5 && c.r[1] >= o.r[1] - 0.5 && c.r[3] <= o.r[3] + 0.5)));
+    const usadas = new Set();
+    for (const c of mues) {
+      if (usadas.has(c)) continue; const grupo = [c]; usadas.add(c); let bb = c.r.slice();
+      for (let cambio = true; cambio;) { cambio = false;
+        for (const o of mues) if (!usadas.has(o) && o.r[1] < bb[3] + o.h * 1.2 && o.r[3] > bb[1] - o.h * 1.2 && o.r[0] < bb[2] + 260 && o.r[2] > bb[0] - 260) {
+          usadas.add(o); grupo.push(o); bb = [Math.min(bb[0], o.r[0]), Math.min(bb[1], o.r[1]), Math.max(bb[2], o.r[2]), Math.max(bb[3], o.r[3])]; cambio = true; } }
+      if (grupo.length >= 4 && bb[3] - bb[1] < 90 && !res.some(z => solapaX(z, bb) && solapaY(z, bb))) res.push([bb[0] - 4, bb[1] - 3, bb[2] + 170, bb[3] + 3]);
+    }
+    return res;
   }
   function estructurar(els, W, H) {
     const textos = [], imgs = [], lineas = [], cajas = [], dibujos = [];
@@ -1763,9 +1782,6 @@ const PDFX = (() => {
           else lineas.push({o: 'v', p: (r[0] + r[2]) / 2, a: r[1], b: r[3], w: Math.max(w, 0.6), c: q.fill});
         } else if (q.fill && !esBlanco(q.fill) && q.fa > 0.05) {
           cajas.push({bb: r, c: q.fill, borde: q.stroke ? {w: q.lw, c: q.stroke} : null});
-          // bordes «virtuales» (sin dibujo) de las celdas pintadas: así una fila de encabezado de color o una tabla sin líneas también es tabla
-          lineas.push({o: 'h', p: r[1], a: r[0], b: r[2], w: 0, c: null}, {o: 'h', p: r[3], a: r[0], b: r[2], w: 0, c: null},
-            {o: 'v', p: r[0], a: r[1], b: r[3], w: 0, c: null}, {o: 'v', p: r[2], a: r[1], b: r[3], w: 0, c: null});
         }
         if (q.stroke && w > 2.6 && h > 2.6) {
           lineas.push({o: 'h', p: r[1], a: r[0], b: r[2], w: q.lw, c: q.stroke}, {o: 'h', p: r[3], a: r[0], b: r[2], w: q.lw, c: q.stroke},
@@ -1777,6 +1793,12 @@ const PDFX = (() => {
         else lineas.push({o: 'v', p: sg[0], a: Math.min(sg[1], sg[3]), b: Math.max(sg[1], sg[3]), w: q.lw, c: q.stroke});
       }
     }
+    // bordes «virtuales» (sin dibujo) de las celdas pintadas: así una fila de encabezado de color o una tabla sin líneas también es tabla.
+    // Solo para cajas que se tocan con otra (una grilla); una caja suelta (muestra de color de una leyenda, etiqueta) no arma tabla.
+    const toca = (a, b) => a !== b && a.bb[0] <= b.bb[2] + 1.5 && b.bb[0] <= a.bb[2] + 1.5 && a.bb[1] <= b.bb[3] + 1.5 && b.bb[1] <= a.bb[3] + 1.5;
+    for (const k of cajas) { if (!cajas.some(o => toca(k, o))) { k.suelta = true; continue; } const r = k.bb;
+      lineas.push({o: 'h', p: r[1], a: r[0], b: r[2], w: 0, c: null}, {o: 'h', p: r[3], a: r[0], b: r[2], w: 0, c: null},
+        {o: 'v', p: r[0], a: r[1], b: r[3], w: 0, c: null}, {o: 'v', p: r[2], a: r[1], b: r[3], w: 0, c: null}); }
     // subrayados: línea corta justo bajo un texto → se marca el texto y se quita la línea
     for (let i = lineas.length - 1; i >= 0; i--) {
       const l = lineas[i]; if (l.o !== 'h' || l.b - l.a > W * 0.9 || !l.c || esBlanco(l.c)) continue;
