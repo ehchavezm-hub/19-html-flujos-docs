@@ -442,7 +442,7 @@ button[aria-pressed=true]{background:var(--acc);color:#fff;border-color:var(--ac
 .canvas{flex:1;overflow:auto;margin:8px 12px 12px;background:var(--papel);border:1px solid var(--linea2);border-radius:2px;cursor:grab;position:relative;min-height:0;overscroll-behavior:contain}
 .canvas.drag{cursor:grabbing}.stage{transform-origin:0 0;width:max-content}.stage svg{display:block}
 .frame{flex:1;margin:8px 12px 12px;border:1px solid var(--linea2);border-radius:2px;overflow:auto;background:#e3e6e8;min-height:0}
-.frame iframe{border:0;width:100%;height:100%;display:block;background:#fff}.frame .zoomwrap{transform-origin:0 0;height:100%}
+.frame iframe{border:0;width:100%;height:100%;display:block;background:#fff}.frame .zoomwrap{transform-origin:0 0;height:100%}.frame .sdoc{min-height:100%}
 /* ---- inicio: registro de documentos */
 .home{padding:30px 36px 48px;overflow:auto;max-width:1180px}
 .hero .proy{display:inline-block;font-size:13px;font-weight:500;color:#1A1A1A;background:var(--acc);border-radius:3px;padding:3px 9px;margin-bottom:10px}
@@ -596,10 +596,17 @@ function ver(id){
   } else if((m.tipo==='pdf'&&m.vista!=='html')||m.vista==='pdf'){
     h+='<div class="bar"><span>El zoom, la búsqueda y la impresión del PDF están en la barra del visor.'+(m.vista==='pdf'?' Vista en PDF del archivo original; «Descargar original» baja el '+({word:'Word',excel:'Excel',ppt:'PowerPoint'}[m.tipo])+'.':'')+'</span></div><div class="frame"><iframe title="'+e(m.titulo)+'" src="'+blobUrl(vista(m),'application/pdf')+'"></iframe></div>';
     main.innerHTML=h;
-  } else {
+  } else if(m.vista==='html'){
+    // Word, Excel, PowerPoint y PDF convertidos: se dibujan dentro de la página (Shadow DOM), sin iframe ni blob:,
+    // así funcionan también en SharePoint y otros sitios que bloquean marcos
     h+='<div class="bar"><span class="grp"><button data-z="out" aria-label="Alejar">−</button><span id="zl">100%</span><button data-z="in" aria-label="Acercar">+</button><button data-z="1" title="Volver al 100 %">Tamaño real</button></span></div>'
-      +'<div class="frame" id="fr"><div class="zoomwrap" id="zw"><iframe title="'+e(m.titulo)+'" sandbox="allow-scripts allow-popups allow-modals allow-forms allow-downloads" src="'+htmlUrl(vista(m))+'"></iframe></div></div>';
-    main.innerHTML=h; zoomHtml();
+      +'<div class="frame" id="fr" tabindex="0" aria-label="'+e(m.titulo)+'"><div class="sdoc" id="sd"></div></div>';
+    main.innerHTML=h; sombra($('#sd'),new TextDecoder().decode(bytes(vista(m)))); zoomSombra();
+  } else {
+    // HTML propio del usuario (puede traer sus scripts): marco aislado con srcdoc (no usa blob:)
+    h+='<div class="bar"><span class="grp"><button data-z="out" aria-label="Alejar">−</button><span id="zl">100%</span><button data-z="in" aria-label="Acercar">+</button><button data-z="1" title="Volver al 100 %">Tamaño real</button></span></div>'
+      +'<div class="frame" id="fr"><div class="zoomwrap" id="zw"><iframe title="'+e(m.titulo)+'" sandbox="allow-scripts allow-popups allow-modals allow-forms allow-downloads"></iframe></div></div>';
+    main.innerHTML=h; $('#zw iframe').srcdoc=new TextDecoder().decode(bytes(vista(m)))+PUENTE.replace('<\\/script>','</'+'script>'); zoomHtml();
   }
   // la nota (p. ej. «vista convertida…») va en la barra de herramientas, no ocupa una fila propia
   if(m.nota){const bar=main.querySelector('.bar'); if(bar) bar.insertAdjacentHTML('beforeend','<span class="nota" title="'+e(m.nota)+'">'+e(m.nota)+'</span>'); else main.querySelector('header').insertAdjacentHTML('afterend','<p class="note">'+e(m.nota)+'</p>')}
@@ -646,6 +653,20 @@ window.addEventListener('keydown',ev=>{if(!(ev.ctrlKey||ev.metaKey))return;const
 window.addEventListener('message',ev=>{if(ev.data&&typeof ev.data.pz==='number'&&ZOOM)ZOOM(ev.data.pz)});
 // las vistas HTML van en un iframe: un pequeño script les pasa el Ctrl + rueda al portal
 const PUENTE='<script>addEventListener("wheel",function(e){if(e.ctrlKey){e.preventDefault();parent.postMessage({pz:e.deltaY<0?1:-1},"*")}},{passive:false});addEventListener("keydown",function(e){if(!(e.ctrlKey||e.metaKey))return;var d={"+":1,"=":1,"-":-1,"_":-1,"0":0}[e.key];if(d===undefined)return;e.preventDefault();parent.postMessage({pz:d},"*")});<\/script>';
+function sombra(host,html){
+  const d=new DOMParser().parseFromString(html,'text/html');
+  let css=[...d.querySelectorAll('style')].map(x=>x.textContent).join('\n').replace(/@font-face\s*\{[^}]*\}/g,'');
+  css=css.replace(/(^|[{},;\s])(html|body)(?=[\s{.,:#\[>])/g,'$1.v$2');       // body/html de la vista → contenedores propios
+  d.querySelectorAll('script').forEach(x=>x.remove());
+  const r=host.shadowRoot||host.attachShadow({mode:'open'});
+  r.innerHTML='<style>:host{display:block}.vhtml{min-height:100%}.vbody{min-height:100%}'+css+'</style><div class="vhtml" id="vz"><div class="vbody">'+d.body.innerHTML+'</div></div>';
+  // pestañas de hojas de Excel
+  const tabs=r.querySelectorAll('.tabs button');
+  tabs.forEach(b=>b.onclick=()=>{tabs.forEach(x=>x.removeAttribute('aria-selected'));b.setAttribute('aria-selected','true');r.querySelectorAll('.h').forEach((h,i)=>h.hidden=i!=+b.dataset.h)});
+}
+function zoomSombra(){let s=1;const z=$('#sd').shadowRoot.getElementById('vz');const ap=()=>{z.style.zoom=s;$('#zl').textContent=Math.round(s*100)+'%'};
+  ZOOM=d=>{s=d===0?1:Math.min(3,Math.max(0.3,s*(d>0?1.1:1/1.1)));ap()};
+  main.querySelectorAll('[data-z]').forEach(b=>b.onclick=()=>{const a=b.dataset.z;s=a==='1'?1:Math.min(3,Math.max(0.3,s*(a==='in'?1.2:1/1.2)));ap()})}
 function htmlUrl(id){const k='h-'+id;if(blobs[k])return blobs[k];const t=new TextDecoder().decode(bytes(id));return blobs[k]=URL.createObjectURL(new Blob([t+PUENTE],{type:'text/html'}))}
 function ruta(){ZOOM=null; marcar(); stop(); const id=ACTUAL; if(id&&byId[id]) ver(id); else inicio(); main.scrollTop=0}
 // navegación interna: funciona igual abierto desde la carpeta (file://) o desde el generador (blob:, que no admite #)
