@@ -354,6 +354,68 @@ const MD = (() => {
       k++; }
     return clean;
   }
+  // ------------------------------------------------------------------ flechas que esquivan cajas
+  // Si un tramo atraviesa una caja que no es su origen ni su destino, el recorrido se rehace con una búsqueda
+  // ortogonal (Dijkstra sobre una rejilla de pasillos alrededor de las cajas) que minimiza largo y número de quiebres.
+  const corta = (a, b, r, m = 0) => {                 // ¿el tramo a-b (horizontal o vertical) entra en el rectángulo r ampliado m?
+    const x0 = r[0] - m, y0 = r[1] - m, x1 = r[0] + r[2] + m, y1 = r[1] + r[3] + m;
+    if (a[1] === b[1]) { const lo = Math.min(a[0], b[0]), hi = Math.max(a[0], b[0]); return a[1] > y0 + 0.5 && a[1] < y1 - 0.5 && hi > x0 + 0.5 && lo < x1 - 0.5; }
+    const lo = Math.min(a[1], b[1]), hi = Math.max(a[1], b[1]); return a[0] > x0 + 0.5 && a[0] < x1 - 0.5 && hi > y0 + 0.5 && lo < y1 - 0.5;
+  };
+  const choca = (pts, obst) => { for (let j = 1; j < pts.length; j++) for (const r of obst) if (corta(pts[j - 1], pts[j], r)) return true; return false; };
+  function esquivar(pts, sb, tb, s, obst) {
+    if (!sb || !tb || !obst.length || !choca(pts, obst)) return pts;
+    const M = 10, DIR = {L: [-1, 0], R: [1, 0], T: [0, -1], B: [0, 1]};
+    const lados = (b, pre, p) => { const [cs] = constrained(b, s, pre); if (cs) return [[cs, p]];
+      return ['L', 'R', 'T', 'B'].map(sd => [sd, sidePoint(b, sd)]); };
+    const sal = lados(sb, 'exit', pts[0]), lle = lados(tb, 'entry', pts[pts.length - 1]);
+    const fuera = ([sd, p]) => [p[0] + DIR[sd][0] * M, p[1] + DIR[sd][1] * M];
+    const todos = [...obst, sb, tb];
+    const X = new Set(), Y = new Set();
+    for (const r of todos) { X.add(r[0] - M); X.add(r[0] + r[2] + M); Y.add(r[1] - M); Y.add(r[1] + r[3] + M); }
+    for (const pp of [...sal, ...lle]) { const q = fuera(pp); X.add(q[0]); Y.add(q[1]); X.add(pp[1][0]); Y.add(pp[1][1]); }
+    const xs = [...X].map(v => Math.round(v * 10) / 10).sort((a, b) => a - b), ys = [...Y].map(v => Math.round(v * 10) / 10).sort((a, b) => a - b);
+    const nx = xs.length, ny = ys.length; if (nx * ny > 40000) return pts;
+    const bloq = todos.map(r => r);   // las cajas de origen y destino tampoco se atraviesan
+    const libre = (a, b) => !bloq.some(r => corta(a, b, r, M - 1));
+    const dentro = p => bloq.some(r => p[0] > r[0] - M + 1 && p[0] < r[0] + r[2] + M - 1 && p[1] > r[1] - M + 1 && p[1] < r[1] + r[3] + M - 1);
+    const ix = new Map(xs.map((v, i) => [v, i])), iy = new Map(ys.map((v, i) => [v, i]));
+    const key = (i, j, d) => (i * ny + j) * 4 + d;   // d: 0 der, 1 izq, 2 abajo, 3 arriba
+    const DV = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    const dist = new Map(), prev = new Map(); const heap = [];
+    const push = (c, k) => { heap.push([c, k]); let i = heap.length - 1; while (i) { const pa = (i - 1) >> 1; if (heap[pa][0] <= heap[i][0]) break; [heap[pa], heap[i]] = [heap[i], heap[pa]]; i = pa; } };
+    const pop = () => { const t = heap[0], l = heap.pop(); if (heap.length) { heap[0] = l; let i = 0; for (;;) { const a = 2 * i + 1, b = a + 1; let m = i;
+      if (a < heap.length && heap[a][0] < heap[m][0]) m = a; if (b < heap.length && heap[b][0] < heap[m][0]) m = b; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } } return t; };
+    const dirDe = sd => ({R: 0, L: 1, B: 2, T: 3}[sd]);
+    for (const pp of sal) { const q = fuera(pp); const i = ix.get(Math.round(q[0] * 10) / 10), j = iy.get(Math.round(q[1] * 10) / 10);
+      if (i === undefined || j === undefined) continue; const k = key(i, j, dirDe(pp[0])); dist.set(k, M); prev.set(k, ['ini', pp]); push(M, k); }
+    const metas = new Map();
+    for (const pp of lle) { const q = fuera(pp); const i = ix.get(Math.round(q[0] * 10) / 10), j = iy.get(Math.round(q[1] * 10) / 10);
+      if (i !== undefined && j !== undefined) metas.set(i * ny + j, pp); }
+    const BEND = 40; let fin = null;
+    while (heap.length) {
+      const [c, k] = pop(); if (c > (dist.get(k) ?? 1e18)) continue;
+      const d = k % 4, n = (k - d) / 4, i = Math.floor(n / ny), j = n % ny;
+      const meta = metas.get(n);
+      if (meta) { const llega = {L: 0, R: 1, T: 2, B: 3}[meta[0]]; if (d === llega) { fin = [k, meta]; break; } }
+      for (let nd = 0; nd < 4; nd++) {
+        if ((d ^ 1) === nd && d >> 1 === nd >> 1) continue;   // sin dar media vuelta
+        const i2 = i + DV[nd][0], j2 = j + DV[nd][1]; if (i2 < 0 || j2 < 0 || i2 >= nx || j2 >= ny) continue;
+        const a = [xs[i], ys[j]], b = [xs[i2], ys[j2]]; if (dentro(b) || !libre(a, b)) continue;
+        const k2 = key(i2, j2, nd), c2 = c + Math.abs(b[0] - a[0]) + Math.abs(b[1] - a[1]) + (nd !== d ? BEND : 0);
+        if (c2 < (dist.get(k2) ?? 1e18)) { dist.set(k2, c2); prev.set(k2, k); push(c2, k2); }
+      }
+    }
+    if (!fin) return pts;
+    const camino = []; let k = fin[0], ini = null;
+    while (true) { const d = k % 4, n = (k - d) / 4; camino.push([xs[Math.floor(n / ny)], ys[n % ny]]); const pk = prev.get(k); if (Array.isArray(pk) && pk[0] === 'ini') { ini = pk[1]; break; } k = pk; }
+    camino.reverse();
+    const out = [ini[1], ...camino, fin[1][1]];
+    const limpio = [out[0]];
+    for (const p of out.slice(1)) { const l = limpio[limpio.length - 1]; if (Math.abs(p[0] - l[0]) < 0.01 && Math.abs(p[1] - l[1]) < 0.01) continue; limpio.push(p); }
+    for (let q = 1; q < limpio.length - 1;) { const a = limpio[q - 1], b = limpio[q], c = limpio[q + 1]; if ((a[0] === b[0] && b[0] === c[0]) || (a[1] === b[1] && b[1] === c[1])) limpio.splice(q, 1); else q++; }
+    return limpio;
+  }
   function pathD(pts, hops, r = 7, hr = 4.5) {
     let d = 'M' + e1(pts[0][0]) + ' ' + e1(pts[0][1]);
     for (let k = 1; k < pts.length; k++) {
@@ -384,7 +446,10 @@ const MD = (() => {
     const content = verts.slice();   // el título también se dibuja, en su lugar y con su recuadro
     const xs = [...content.map(i => B.get(i)[0]), ...content.map(i => B.get(i)[0] + B.get(i)[2])];
     const ys = [...content.map(i => B.get(i)[1]), ...content.map(i => B.get(i)[1] + B.get(i)[3])];
-    const E = [];
+    const E = []; const CRUCES = {antes: 0, despues: 0};
+    // cajas que una flecha no debe atravesar (todo menos carriles); las que contienen al origen/destino no cuentan
+    const OBST = verts.filter(i => !['lane'].includes(kinds.get(i)));
+    const contiene = (a, b) => { const A_ = B.get(a), B_ = B.get(b); return A_[0] <= B_[0] + 0.5 && A_[1] <= B_[1] + 0.5 && A_[0] + A_[2] >= B_[0] + B_[2] - 0.5 && A_[1] + A_[3] >= B_[1] + B_[3] - 0.5; };
     for (const c of D.cells.values()) {
       if (!c.edge) continue; const i = c.id, s = D.st.get(i);
       let src = c.source, tgt = c.target;
@@ -396,7 +461,10 @@ const MD = (() => {
           if (p.getAttribute('as') === 'sourcePoint') sp = pt; if (p.getAttribute('as') === 'targetPoint') tp = pt; } }
       const sb = B.has(src) ? B.get(src) : null, tb = B.has(tgt) ? B.get(tgt) : null;
       if ((!sb && !sp) || (!tb && !tp)) continue;
-      const pts = route(sb, tb, wps, s, sp, tp);
+      let pts = route(sb, tb, wps, s, sp, tp);
+      const obsE = sb && tb ? OBST.filter(o => o !== src && o !== tgt && !contiene(o, src) && !contiene(o, tgt)).map(o => B.get(o)) : [];
+      const antes = choca(pts, obsE); if (sb && tb) pts = esquivar(pts, sb, tb, s, obsE);
+      CRUCES.antes += antes ? 1 : 0; CRUCES.despues += choca(pts, obsE) ? 1 : 0;
       const lab = [...labelLines(c.value), ...(elabels.get(i) || [])];
       E.push({id: i, s: sb ? src : null, t: tb ? tgt : null, pts, dash: s.dashed === '1', arrow: (s.endArrow || 'classic') !== 'none',
         startArrow: !['none', ''].includes(s.startArrow || 'none'), label: lab.join(' '), lx: gg ? (parseFloat(gg.getAttribute('x')) || 0) : 0});
@@ -607,7 +675,7 @@ const MD = (() => {
     VH = Math.max(VH, Math.ceil((ly + 30) / 4) * 4);
     o[3] = '<rect width="' + VW + '" height="' + VH + '" fill="' + PAPER + '"/>';
     const svg = '<svg viewBox="0 0 ' + VW + ' ' + VH + '" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="' + slug + '-title ' + slug + '-desc">\n' + o.join('\n') + '\n</svg>';
-    return {svg, w: VW, h: VH, pasos: STEPS, texto: textos.join(' ')};
+    return {svg, w: VW, h: VH, pasos: STEPS, texto: textos.join(' '), cruces: CRUCES};
   }
   return {render};
 })();
