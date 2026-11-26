@@ -378,28 +378,28 @@ body{font-family:__FONT__;color:var(--tinta);background:var(--fondo);display:gri
 /* ---- menú lateral (Engineering Black, compacto) */
 aside{background:var(--side);color:var(--side-ink);display:flex;flex-direction:column;min-height:0;border-top:4px solid var(--acc)}
 .brand{padding:14px 16px 10px}
-.brand .proy{display:block;font-size:11.5px;font-weight:500;color:#FF8833;margin-bottom:3px;letter-spacing:.01em}
-.brand b{display:block;font-size:17px;font-weight:600;letter-spacing:-.015em;line-height:1.2;color:#fff;text-wrap:balance}
-.brand em{display:block;font-style:normal;font-size:12.5px;color:var(--side-mut);margin-top:2px}
-.brand span{display:block;font-size:11px;color:var(--side-mut);margin-top:6px}
+.brand .proy{display:block;font-size:10.17px;font-weight:500;color:#FF8833;margin-bottom:3px;letter-spacing:.01em}
+.brand b{display:block;font-size:15.67px;font-weight:600;letter-spacing:-.015em;line-height:1.2;color:#fff;text-wrap:balance}
+.brand em{display:block;font-style:normal;font-size:11.17px;color:var(--side-mut);margin-top:2px}
+.brand span{display:block;font-size:9.67px;color:var(--side-mut);margin-top:6px}
 .search{padding:2px 12px 6px;position:relative}
 .search svg{position:absolute;left:23px;top:11px;width:14px;height:14px;color:var(--side-mut);pointer-events:none}
-.search input{width:100%;padding:7px 10px 7px 30px;border-radius:var(--r);border:1px solid #ffffff2b;background:#ffffff14;color:#fff;font:inherit;font-size:13px;transition:border-color .15s,background-color .15s}
+.search input{width:100%;padding:7px 10px 7px 30px;border-radius:var(--r);border:1px solid #ffffff2b;background:#ffffff14;color:#fff;font:inherit;font-size:11.67px;transition:border-color .15s,background-color .15s}
 .search input:hover{border-color:#ffffff4d}.search input:focus{outline:none;border-color:var(--acc);background:#ffffff1f}.search input::placeholder{color:var(--side-mut)}
 nav{overflow:auto;padding:0 6px 12px;flex:1;scrollbar-width:thin;scrollbar-color:#ffffff33 transparent;overscroll-behavior:contain}
-.sec{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:14px 8px 2px;padding-top:0;font-size:11.5px;font-weight:500;color:#5A9FD4}
+.sec{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:14px 8px 2px;padding-top:0;font-size:10.17px;font-weight:500;color:#5A9FD4}
 nav .sec:first-child{border-top:0;margin-top:4px;padding-top:2px}
-.sec i{font-style:normal;font-weight:400;font-size:11px;color:var(--side-mut);font-variant-numeric:tabular-nums}
-nav a{position:relative;display:flex;gap:8px;align-items:baseline;padding:3px 8px 3px 10px;border-radius:4px;color:var(--side-ink);text-decoration:none;font-size:12.75px;line-height:1.3;transition:background-color .12s}
+.sec i{font-style:normal;font-weight:400;font-size:9.67px;color:var(--side-mut);font-variant-numeric:tabular-nums}
+nav a{position:relative;display:flex;gap:8px;align-items:baseline;padding:3px 8px 3px 10px;border-radius:4px;color:var(--side-ink);text-decoration:none;font-size:11.42px;line-height:1.3;transition:background-color .12s}
 nav a:hover{background:#ffffff14;color:#fff}
 nav a.on{background:#ffffff26;color:#fff;font-weight:500}
 nav a.on::before{content:"";position:absolute;left:0;top:3px;bottom:3px;width:3px;border-radius:0 2px 2px 0;background:var(--acc)}
 nav a .tt{flex:1;min-width:0}
 .dot{flex:none;width:7px;height:7px;border-radius:1px;background:var(--c,#8a949a);transform:translateY(-1px)}
 nav a.pend{color:var(--side-mut)}nav a.pend .dot{background:transparent;box-shadow:inset 0 0 0 1.5px #FF8833}
-nav a .sub{flex:none;font-size:10px;font-weight:500;color:#FF8833}
-.foot{display:flex;gap:14px;font-size:11.5px;color:var(--side-mut);padding:9px 16px}.foot b{color:#fff;font-weight:500;font-variant-numeric:tabular-nums}
-.empty{padding:14px 10px;color:var(--side-mut);font-size:13px}
+nav a .sub{flex:none;font-size:8.67px;font-weight:500;color:#FF8833}
+.foot{display:flex;gap:14px;font-size:10.17px;color:var(--side-mut);padding:9px 16px}.foot b{color:#fff;font-weight:500;font-variant-numeric:tabular-nums}
+.empty{padding:14px 10px;color:var(--side-mut);font-size:11.67px}
 /* ---- área de trabajo */
 main{display:flex;flex-direction:column;min-width:0;min-height:0}
 header.vh{background:var(--papel);border-bottom:1px solid var(--linea);padding:5px 12px;display:flex;gap:12px;align-items:center}
