@@ -224,8 +224,88 @@ const OX = (() => {
     if (bpp === 32 && !alfa) for (let i = 3; i < o.length; i += 4) o[i] = 255;    // 32 bits sin alfa real: opaco
     return {imagen: id};
   }
+  // ---------- WMF → SVG: dibujos vectoriales de Windows (sellos, logos, diagramas pegados en Word/PowerPoint)
+  // Soporta lo habitual: lápices, rellenos, fuentes, polígonos, polilíneas, rectángulos, elipses, líneas, textos y mapas de bits.
+  async function wmfASvg(u8) {
+    const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+    const plac = dv.getUint32(0, true) === 0x9AC6CDD7; let p = plac ? 22 : 0;
+    if (p + 18 > u8.length) return null; p += dv.getUint16(p + 2, true) * 2;
+    let org = [0, 0], ext = plac ? [dv.getInt16(10, true) - dv.getInt16(6, true), dv.getInt16(12, true) - dv.getInt16(8, true)] : null;
+    if (plac) org = [dv.getInt16(6, true), dv.getInt16(8, true)];
+    const objs = []; const nuevo = o => { let i = objs.indexOf(null); if (i < 0) i = objs.length; objs[i] = o; };
+    const col = o => '#' + [u8[o], u8[o + 1], u8[o + 2]].map(v => v.toString(16).padStart(2, '0')).join('');
+    let st = {pen: {c: '#000', w: 1, nulo: false}, brush: {c: '#fff', nulo: false}, font: {h: 12, w: 400, it: false, f: 'Arial', esc: 0}, tc: '#000', ta: 0, pos: [0, 0]};
+    const pila = []; let out = ''; let n = 0;
+    const est = (relleno) => (relleno && !st.brush.nulo ? 'fill="' + st.brush.c + '"' : 'fill="none"') + (st.pen.nulo ? '' : ' stroke="' + st.pen.c + '" stroke-width="' + Math.max(st.pen.w, 1) + '"');
+    const pts = (o, k) => { const a = []; for (let i = 0; i < k; i++) a.push(dv.getInt16(o + i * 4, true) + ',' + dv.getInt16(o + i * 4 + 2, true)); return a.join(' '); };
+    const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const dec = new TextDecoder('windows-1252');
+    const texto = (x, y, s, largo) => {
+      if (!s.trim()) return; const f = st.font, h = Math.abs(f.h) || 12;
+      const anc = (st.ta & 6) === 6 ? 'middle' : (st.ta & 2) ? 'end' : 'start';
+      const base = (st.ta & 24) === 24 ? 'alphabetic' : (st.ta & 8) ? 'text-after-edge' : 'text-before-edge';
+      out += '<text x="' + x + '" y="' + y + '" font-size="' + h + '" font-family="' + esc(f.f) + ', Arial, sans-serif"' + (f.w >= 600 ? ' font-weight="700"' : '') + (f.it ? ' font-style="italic"' : '') +
+        ' fill="' + st.tc + '" text-anchor="' + anc + '" dominant-baseline="' + base + '"' + (f.esc ? ' transform="rotate(' + (-f.esc / 10) + ' ' + x + ' ' + y + ')"' : '') + (largo > 0 && s.length > 1 ? ' textLength="' + largo + '" lengthAdjust="spacingAndGlyphs"' : '') + ' xml:space="preserve">' + esc(s) + '</text>';
+    };
+    for (; p + 6 <= u8.length;) {
+      const sz = dv.getUint32(p, true) * 2, fn = dv.getUint16(p + 4, true); if (sz < 6 || fn === 0) break; const a = p + 6;
+      switch (fn) {
+        case 0x020B: org = [dv.getInt16(a + 2, true), dv.getInt16(a, true)]; break;                      // SetWindowOrg
+        case 0x020C: ext = [dv.getInt16(a + 2, true), dv.getInt16(a, true)]; break;                      // SetWindowExt
+        case 0x001E: pila.push(JSON.parse(JSON.stringify(st))); break;                                     // SaveDC
+        case 0x0127: if (pila.length) st = pila.pop(); break;                                              // RestoreDC
+        case 0x0209: st.tc = col(a); break;                                                                // SetTextColor
+        case 0x012E: st.ta = dv.getUint16(a, true); break;                                                 // SetTextAlign
+        case 0x02FA: { const s = dv.getUint16(a, true); nuevo({t: 'pen', c: col(a + 6), w: dv.getInt16(a + 2, true), nulo: (s & 15) === 5}); break; }
+        case 0x02FC: { const s = dv.getUint16(a, true); nuevo({t: 'brush', c: col(a + 2), nulo: s === 1}); break; }
+        case 0x02FB: { let f = ''; for (let i = 18; i < 50 && u8[a + i]; i++) f += String.fromCharCode(u8[a + i]);
+          nuevo({t: 'font', h: dv.getInt16(a, true), esc: dv.getInt16(a + 4, true), w: dv.getInt16(a + 8, true), it: !!u8[a + 10], f: f || 'Arial'}); break; }
+        case 0x00F7: case 0x06FF: case 0x01F9: case 0x0142: nuevo({t: 'otro'}); break;                    // paleta, región, tramas
+        case 0x012D: { const o = objs[dv.getUint16(a, true)]; if (o) { if (o.t === 'pen') st.pen = o; else if (o.t === 'brush') st.brush = o; else if (o.t === 'font') st.font = o; } break; }
+        case 0x01F0: objs[dv.getUint16(a, true)] = null; break;                                            // DeleteObject
+        case 0x0324: out += '<polygon points="' + pts(a + 2, dv.getInt16(a, true)) + '" ' + est(true) + '/>'; n++; break;
+        case 0x0325: out += '<polyline points="' + pts(a + 2, dv.getInt16(a, true)) + '" ' + est(false) + '/>'; n++; break;
+        case 0x0538: { const k = dv.getUint16(a, true); let o = a + 2 + k * 2, d = '';                     // PolyPolygon
+          for (let i = 0; i < k; i++) { const c = dv.getUint16(a + 2 + i * 2, true); d += 'M' + pts(o, c).replace(/ /g, 'L') + 'Z'; o += c * 4; }
+          out += '<path d="' + d + '" fill-rule="evenodd" ' + est(true) + '/>'; n++; break; }
+        case 0x041B: case 0x0418: case 0x061C: { const off = fn === 0x061C ? 4 : 0;                       // Rectangle, Ellipse, RoundRect
+          const b = dv.getInt16(a + off, true), r = dv.getInt16(a + off + 2, true), t = dv.getInt16(a + off + 4, true), l = dv.getInt16(a + off + 6, true);
+          out += fn === 0x0418 ? '<ellipse cx="' + (l + r) / 2 + '" cy="' + (t + b) / 2 + '" rx="' + Math.abs(r - l) / 2 + '" ry="' + Math.abs(b - t) / 2 + '" ' + est(true) + '/>'
+            : '<rect x="' + Math.min(l, r) + '" y="' + Math.min(t, b) + '" width="' + Math.abs(r - l) + '" height="' + Math.abs(b - t) + '"' + (fn === 0x061C ? ' rx="' + dv.getInt16(a + 2, true) / 2 + '"' : '') + ' ' + est(true) + '/>'; n++; break; }
+        case 0x0214: st.pos = [dv.getInt16(a + 2, true), dv.getInt16(a, true)]; break;                     // MoveTo
+        case 0x0213: { const q = [dv.getInt16(a + 2, true), dv.getInt16(a, true)];                         // LineTo
+          if (!st.pen.nulo) out += '<line x1="' + st.pos[0] + '" y1="' + st.pos[1] + '" x2="' + q[0] + '" y2="' + q[1] + '" stroke="' + st.pen.c + '" stroke-width="' + Math.max(st.pen.w, 1) + '"/>'; st.pos = q; n++; break; }
+        case 0x0A32: { const y = dv.getInt16(a, true), x = dv.getInt16(a + 2, true), k = dv.getInt16(a + 4, true), op = dv.getUint16(a + 6, true);   // ExtTextOut
+          const so = a + 8 + (op & 6 ? 8 : 0); if (k > 0 && so + k <= p + sz) {
+            // separaciones entre letras (dx): dan el ancho exacto del texto
+            const dxo = so + k + (k & 1); let largo = 0; if (dxo + k * 2 <= p + sz) { for (let i = 0; i < k - 1; i++) largo += dv.getInt16(dxo + i * 2, true); largo += Math.abs(st.font.h) * 0.5; }
+            texto(x, y, dec.decode(u8.subarray(so, so + k)), 0); } n++; break; }
+        case 0x0521: { const k = dv.getInt16(a, true); const s = dec.decode(u8.subarray(a + 2, a + 2 + k)); const o = a + 2 + k + (k & 1);   // TextOut
+          texto(dv.getInt16(o + 2, true), dv.getInt16(o, true), s); n++; break; }
+        case 0x0B41: case 0x0F43: case 0x0940: {                                                           // mapas de bits
+          let h, w, y, x, dib;
+          if (fn === 0x0F43) { h = dv.getInt16(a + 14, true); w = dv.getInt16(a + 16, true); y = dv.getInt16(a + 18, true); x = dv.getInt16(a + 20, true); dib = a + 22; }
+          else if (fn === 0x0B41) { h = dv.getInt16(a + 12, true); w = dv.getInt16(a + 14, true); y = dv.getInt16(a + 16, true); x = dv.getInt16(a + 18, true); dib = a + 20; }
+          else { h = dv.getInt16(a + 10, true); w = dv.getInt16(a + 12, true); y = dv.getInt16(a + 14, true); x = dv.getInt16(a + 16, true); dib = a + 18; }
+          if (dib + 12 < p + sz) { const r = dibAPng(u8, dib); let url = null;
+            if (r && r.datos) url = 'data:' + r.mime + ';base64,' + b64(r.datos);
+            else if (r && r.imagen) { const cv = new OffscreenCanvas(r.imagen.width, r.imagen.height); cv.getContext('2d').putImageData(r.imagen, 0, 0);
+              url = 'data:image/png;base64,' + b64(new Uint8Array(await (await cv.convertToBlob({type: 'image/png'})).arrayBuffer())); }
+            if (url) out += '<image x="' + Math.min(x, x + w) + '" y="' + Math.min(y, y + h) + '" width="' + Math.abs(w) + '" height="' + Math.abs(h) + '" preserveAspectRatio="none" href="' + url + '"/>'; }
+          n++; break; }
+      }
+      p += sz;
+    }
+    if (!n || !ext) return null;
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="' + org[0] + ' ' + org[1] + ' ' + ext[0] + ' ' + ext[1] + '" preserveAspectRatio="none">' + out + '</svg>';
+    return {datos: new TextEncoder().encode(svg), mime: 'image/svg+xml'};
+  }
+  const b64 = b => { let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(s); };
   async function metaArchivoAImagen(u8) {
     try {
+      // WMF con dibujo vectorial (no solo una imagen): se convierte a SVG completo
+      { const dv0 = new DataView(u8.buffer, u8.byteOffset, u8.byteLength); const esEmf = dv0.getUint32(0, true) === 1 && u8.length > 44 && dv0.getUint32(40, true) === 0x464D4520;
+        if (!esEmf) { const r = await wmfASvg(u8); if (r) return r; } }
       // 1) PNG o JPG incrustado (EMF+)
       const busca = (sig, desde) => { outer: for (let i = desde; i < u8.length - sig.length; i++) { for (let j = 0; j < sig.length; j++) if (u8[i + j] !== sig[j]) continue outer; return i; } return -1; };
       const ip = busca([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A], 0);
@@ -235,15 +315,25 @@ const OX = (() => {
       // 2) mapas de bits en registros EMF o WMF: el más grande
       const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength); const cand = [];
       if (dv.getUint32(0, true) === 1 && dv.getUint32(40, true) === 0x464D4520) {           // EMF
+        const area = o => Math.max(1, (dv.getInt32(o + 8, true) - dv.getInt32(o, true)) * (dv.getInt32(o + 12, true) - dv.getInt32(o + 4, true)));
+        const total = area(8); let dibujo = 0;
         for (let p = 0; p + 8 <= u8.length;) { const t = dv.getUint32(p, true), n = dv.getUint32(p + 4, true); if (n < 8) break;
-          if (t === 81 && n > 80) cand.push(p + dv.getUint32(p + 48, true));                    // StretchDIBits
+          // un mapa de bits pequeño dentro de un dibujo vectorial (p. ej. el logo de un sello) no representa la imagen
+          if (t === 81 && n > 80) { if (area(p + 8) >= total * 0.6) cand.push(p + dv.getUint32(p + 48, true)); else dibujo++; }  // StretchDIBits
           else if ((t === 76 || t === 77) && n > 100 && dv.getUint32(p + 88, true)) cand.push(p + dv.getUint32(p + 84, true)); // BitBlt / StretchBlt
           p += n; }
       } else {                                                                                  // WMF (con o sin cabecera «placeable»)
-        let p = dv.getUint32(0, true) === 0x9AC6CDD7 ? 22 : 0; p += dv.getUint16(p + 2, true) * 2;
+        const plac = dv.getUint32(0, true) === 0x9AC6CDD7; let p = plac ? 22 : 0; p += dv.getUint16(p + 2, true) * 2;
+        let total = plac ? Math.abs((dv.getInt16(10, true) - dv.getInt16(6, true)) * (dv.getInt16(12, true) - dv.getInt16(8, true))) : 0;
+        const wm = [];
         for (; p + 6 <= u8.length;) { const n = dv.getUint32(p, true) * 2, f = dv.getUint16(p + 4, true); if (n < 6) break;
-          if (f === 0x0F43) cand.push(p + 28); else if (f === 0x0B41) cand.push(p + 26); else if (f === 0x0940 && n > 40) cand.push(p + 22);
+          if (f === 0x020C && !total) total = Math.abs(dv.getInt16(p + 6, true) * dv.getInt16(p + 8, true));      // SetWindowExt
+          if (f === 0x0F43) wm.push([p + 28, Math.abs(dv.getInt16(p + 20, true) * dv.getInt16(p + 22, true))]);
+          else if (f === 0x0B41) wm.push([p + 26, Math.abs(dv.getInt16(p + 18, true) * dv.getInt16(p + 20, true))]);
+          else if (f === 0x0940 && n > 40) wm.push([p + 22, Math.abs(dv.getInt16(p + 16, true) * dv.getInt16(p + 18, true))]);
           p += n; }
+        // un mapa de bits que ocupa solo una parte del dibujo (logo dentro de un sello) no representa la imagen completa
+        for (const [o, a] of wm) if (!total || a >= total * 0.6) cand.push(o);
       }
       let mejor = null, area = 0;
       for (const off of cand) { const r = dibAPng(u8, off); if (!r) continue; const a = r.imagen ? r.imagen.width * r.imagen.height : 1e9; if (a > area) { mejor = r; area = a; } }
@@ -678,6 +768,11 @@ const OX = (() => {
       const refV = rv === 'page' ? [0, pagH] : rv === 'margin' ? [mT, cH] : rv === 'topMargin' ? [0, mT] : rv === 'bottomMargin' ? [pagH - sec.mB, sec.mB] : [0, 0];
       let y = pv100 ? refV[0] + refV[1] * num(pv100.textContent) / 100000 : ov ? refV[0] + EPX(num(ov.textContent)) : refV[0] + ({center: (refV[1] - hpx) / 2, bottom: refV[1] - hpx}[av ? av.textContent : 'top'] || 0);
       const detras = A(anc, 'behindDoc') === '1'; const z_ = detras ? 0 : 3;
+      // dentro de una celda con «layoutInCell»: Word lo ubica respecto de la celda, no de la página
+      if (ctx.enCelda && A(anc, 'layoutInCell') !== '0') {
+        const cx = ph100 ? 0 : oh ? EPX(num(oh.textContent)) : 0, cy = pv100 ? 0 : ov ? EPX(num(ov.textContent)) : 0;
+        const hx = ['page', 'margin', 'leftMargin', 'insideMargin', 'column', 'character'].includes(rh) ? cx : cx, vy = cy;
+        return '<span class="ab" style="left:' + f2(hx - (ctx.indent || 0)) + 'px;top:' + f2(vy) + 'px;width:' + f2(wpx) + 'px;' + alto(hpx) + ';z-index:' + z_ + '">' + inner + '</span>'; }
       const html_ = '<div class="ab" style="left:' + f2(x) + 'px;top:' + f2(y) + 'px;width:' + f2(wpx) + 'px;' + alto(hpx) + ';z-index:' + z_ + '">' + inner + '</div>';
       if (enPagina) { ctx.flotantes.push(html_); return '\u0002F' + (ctx.flotantes.length - 1) + '\u0002'; }
       // relativo al párrafo/línea: posición dentro del párrafo (que es relativo), x medido desde el margen izquierdo
@@ -801,7 +896,7 @@ const OX = (() => {
           const cm = {}; const tm = kid(c.pr, 'tcMar'); if (tm) for (const x of tm.children) cm[x.localName] = num(A(x, 'w:w'));
           const pad = k => cm[k] ?? mar[k] ?? (k === 'left' || k === 'right' || k === 'start' || k === 'end' ? 108 : 0);
           st.push('padding:' + [pad('top'), cm.right ?? mar.right ?? mar.end ?? 108, pad('bottom'), cm.left ?? mar.left ?? mar.start ?? 108].map(v => f2(PX(v)) + 'px').join(' '));
-          o += '<td' + (c.span > 1 ? ' colspan="' + c.span + '"' : '') + (c.rows > 1 ? ' rowspan="' + c.rows + '"' : '') + ' style="' + st.join(';') + '">' + (await bloques(c.tc, Object.assign({}, ctx, {enTabla: true}))).split(PAG).join('') + '</td>';
+          o += '<td' + (c.span > 1 ? ' colspan="' + c.span + '"' : '') + (c.rows > 1 ? ' rowspan="' + c.rows + '"' : '') + ' style="' + st.join(';') + '">' + (await bloques(c.tc, Object.assign({}, ctx, {enTabla: true, enCelda: true}))).split(PAG).join('') + '</td>';
         }
         o += '</tr>';
       }
@@ -865,8 +960,9 @@ const OX = (() => {
     for (let k = 0; k < paginas.length; k++) {
       const P = paginas[k], S = P.S;
       const cab = await hf(S, 'headerReference', k + 1, total, P.primera), pie = await hf(S, 'footerReference', k + 1, total, P.primera);
-      out += '<div class="pag" style="width:' + f2(S.w) + 'px;min-height:' + f2(S.h) + 'px;padding:' + f2(S.mT) + 'px ' + f2(S.mR) + 'px ' + f2(S.mB) + 'px ' + f2(S.mL) + 'px">' +
-        (cab ? '<div class="hd" style="top:' + f2(S.hd) + 'px;left:' + f2(S.mL) + 'px;right:' + f2(S.mR) + 'px">' + cab + '</div>' : '') +
+      // el encabezado va en el flujo (como en Word): si es más alto que el margen superior, empuja el cuerpo hacia abajo
+      out += '<div class="pag" style="width:' + f2(S.w) + 'px;min-height:' + f2(S.h) + 'px;padding:' + f2(cab ? Math.min(S.hd, S.mT) : S.mT) + 'px ' + f2(S.mR) + 'px ' + f2(S.mB) + 'px ' + f2(S.mL) + 'px">' +
+        (cab ? '<div class="hd" style="min-height:' + f2(Math.max(0, S.mT - S.hd)) + 'px">' + cab + '</div>' : '') +
         P.flot.join('') + '<div class="cuerpo">' + P.html.replace(/\u0001PG\u0001/g, k + 1).replace(/\u0001NP\u0001/g, total) + '</div>' +
         (pie ? '<div class="ft" style="bottom:' + f2(S.ft) + 'px;left:' + f2(S.mL) + 'px;right:' + f2(S.mR) + 'px">' + pie + '</div>' : '') + '<span class="npag">' + (k + 1) + ' / ' + total + '</span></div>';
     }
@@ -874,7 +970,7 @@ const OX = (() => {
     const page = '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>' + esc(titulo) + '</title><style>' +
       'body{margin:0;background:#e3e6ec;padding:24px 12px;font-family:' + fBase + ';color:#000}' +
       '.pag{position:relative;margin:0 auto 24px;background:#fff;box-shadow:0 1px 6px #0003;box-sizing:border-box;overflow:hidden}' +
-      '.cuerpo{position:relative;z-index:1}.hd,.ft{position:absolute;z-index:1;color:#000}' +
+      '.cuerpo{position:relative;z-index:1}.hd{position:relative;z-index:1;color:#000;display:flow-root}.ft{position:absolute;z-index:1;color:#000}' +
       '.p{margin:0;position:relative;overflow-wrap:break-word}.num{display:inline-block;text-indent:0;padding-right:4px}' +
       '.tab{display:inline-block;width:48px}.ld{flex:1;margin:0 3px;min-width:12px;transform:translateY(-0.25em)}.tl{min-width:0}.tr{white-space:nowrap}.ab{position:absolute;box-sizing:border-box}.il{display:inline-block;position:relative;vertical-align:bottom}' +
       '.geo{position:absolute;inset:0;width:100%;height:100%}.tb{position:absolute;inset:0;display:flex;flex-direction:column;box-sizing:border-box;overflow:hidden}.tb.crece{position:relative;inset:auto;min-height:100%}' +
