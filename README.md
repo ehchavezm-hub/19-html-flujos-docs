@@ -22,7 +22,7 @@ Si la carpeta está en Google Drive, usa la carpeta sincronizada en la PC (Googl
 | Formato | Vista |
 |---|---|
 | `.drawio` | Dibujo con sus colores y formas originales; varias páginas, zoom, arrastre y **paso a paso** |
-| `.pdf` | **Reconstruido como HTML real**: párrafos (`<p>`) con su alineación, negritas y colores; tablas como `<table>` (filas, columnas, celdas combinadas, bordes y fondos); imágenes en su lugar. Solo lo que es dibujo (logos vectoriales, texto girado) queda como SVG. Ya no se incrusta el PDF |
+| `.pdf` | Cada página se revisa: las de texto y tablas (Word/Excel exportados) se reconstruyen como **HTML real**; las gráficas (diapositivas, degradados, fotos grandes, gráficos, diagramas o diseño libre) se muestran **idénticas al PDF** (imagen nítida) con el texto encima, seleccionable y buscable. Ninguna página sale desordenada |
 | `.html` | Aislado, con sus imágenes y estilos incrustados |
 | Word `.docx` | Textos, títulos, listas, tablas e imágenes (las EMF/WMF que llevan dentro una imagen común se muestran; las solo vectoriales quedan como recuadro) |
 | Excel `.xlsx` / `.xlsm` | Tablas por hoja: valores, colores, celdas combinadas (sin formato condicional ni gráficos) |
@@ -31,6 +31,10 @@ Si la carpeta está en Google Drive, usa la carpeta sincronizada en la PC (Googl
 
 Todos los documentos tienen **Descargar original** y **Pantalla completa**. Para que el portal sea liviano, los PDF, Word, Excel y PowerPoint no se copian dentro: «Descargar original» abre el archivo de la carpeta (el portal debe quedar junto a los documentos). Si vas a enviar el portal solo, marca «Incluir una copia de los originales». Las fotos grandes se reducen a 1600 px; el **buscador** encuentra títulos,
 datos de la ficha y el texto de los documentos (incluido el de los PDF).
+
+### Vista fiel de Word, Excel y PowerPoint
+
+Si junto a un `.docx`, `.xlsx` o `.pptx` hay un **PDF con el mismo nombre** (exportado desde Office), el portal usa ese PDF como vista (fiel al original), no lo lista aparte, y «Descargar original» baja el archivo de Office. Sin PDF gemelo se usa la conversión propia, que puede variar.
 
 ### Configuración del portal (`Configuracion html … .xlsx`)
 

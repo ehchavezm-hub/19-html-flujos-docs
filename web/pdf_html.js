@@ -10,7 +10,7 @@ const PDFX = (() => {
     closePath: 18, rectangle: 19, stroke: 20, closeStroke: 21, fill: 22, eoFill: 23, fillStroke: 24, eoFillStroke: 25, closeFillStroke: 26, closeEOFillStroke: 27,
     endPath: 28, clip: 29, eoClip: 30, beginText: 31, setCharSpacing: 33, setWordSpacing: 34, setHScale: 35, setLeading: 36, setFont: 37, setTextRenderingMode: 38, setTextRise: 39,
     moveText: 40, setLeadingMoveText: 41, setTextMatrix: 42, nextLine: 43, showText: 44, showSpacedText: 45, nextLineShowText: 46, nextLineSetSpacingShowText: 47,
-    setStrokeColorN: 53, setFillColorN: 55, setStrokeRGBColor: 58, setFillRGBColor: 59, paintFormXObjectBegin: 74, paintFormXObjectEnd: 75, beginGroup: 76, endGroup: 77,
+    setStrokeColorN: 53, setFillColorN: 55, shadingFill: 62, setStrokeRGBColor: 58, setFillRGBColor: 59, paintFormXObjectBegin: 74, paintFormXObjectEnd: 75, beginGroup: 76, endGroup: 77,
     paintImageMaskXObject: 83, paintImageXObject: 85, paintInlineImageXObject: 86, paintImageXObjectRepeat: 88, paintSolidColorImageMask: 90, constructPath: 91};
   const ESC = 96 / 72;                                   // puntos → píxeles CSS (como Word)
   const r1 = v => Math.round(v * 10) / 10, r2 = v => Math.round(v * 100) / 100;
@@ -119,12 +119,14 @@ const PDFX = (() => {
         textoPag.push(txt);
       }
     }
+    const graf = {sombra: 0, curvas: 0, imgArea: 0, giros: 0};   // señales de una página gráfica (no un documento de texto)
     async function imagen(d, mascara) {
       let u = null; if (d && d._id && imgCache.has(d._id)) u = imgCache.get(d._id); else { try { u = await imagenUrl(d); } catch (e) { u = null; } if (d && d._id) imgCache.set(d._id, u); }
       if (!u) return; const m = mul(st.ctm, [1, 0, 0, -1, 0, 1]);
       // la misma imagen (logos del encabezado en cada página) se guarda una sola vez y se reutiliza con <use>
       if (!imgCache.urls.has(u)) imgCache.urls.set(u, 'im' + imgCache.urls.size);
       const cs = [ap(m, 0, 0), ap(m, 1, 0), ap(m, 0, 1), ap(m, 1, 1)]; const xs = cs.map(c => c[0]), ys = cs.map(c => c[1]);
+      graf.imgArea += (Math.max(...xs) - Math.min(...xs)) * (Math.max(...ys) - Math.min(...ys));
       els.push({t: 'i', id: imgCache.urls.get(u), giro: Math.abs(m[1]) > 1e-3 || Math.abs(m[2]) > 1e-3 || m[0] < 0 || m[3] < 0,
         bb: [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)], h: '<use href="#' + imgCache.urls.get(u) + '" transform="matrix(' + m.map(v => +v.toFixed(4)).join(' ') + ')"' + (st.fa < 1 ? ' opacity="' + r2(st.fa) + '"' : '') + '/>'});
     }
@@ -141,7 +143,8 @@ const PDFX = (() => {
         case OPS.setGState: for (const [k, v] of a[0]) { if (k === 'LW') st.lw = v; else if (k === 'ca') st.fa = v; else if (k === 'CA') st.sa = v; else if (k === 'D') st.dash = v[0]; else if (k === 'Font') { st.fid = v[0]; st.font = obj(v[0]); st.size = Math.abs(v[1]); st.dir = v[1] < 0 ? -1 : 1; } } break;
         case OPS.setFillRGBColor: st.fill = hex(a[0], a[1], a[2]); break;
         case OPS.setStrokeRGBColor: st.stroke = hex(a[0], a[1], a[2]); break;
-        case OPS.setFillColorN: st.fill = null; break;             // tramas y degradados: no se dibujan
+        case OPS.setFillColorN: st.fill = null; graf.sombra++; break;             // tramas y degradados: no se dibujan
+        case OPS.shadingFill: graf.sombra++; break;
         case OPS.setStrokeColorN: break;
         case OPS.constructPath: {
           const ops = a[0], c = a[1]; let j = 0, cx = 0, cy = 0;
@@ -151,7 +154,7 @@ const PDFX = (() => {
               if (recto()) geo.rects.push([Math.min(p[0], q[0]), Math.min(p[1], q[1]), Math.max(p[0], q[0]), Math.max(p[1], q[1])]); else geo.curva = true; }
             else if (op === OPS.moveTo) { cx = c[j++]; cy = c[j++]; ruta += 'M' + P(cx, cy); geo.pt = geo.ini = ap(st.ctm, cx, cy); geo.subs.push({p: [geo.pt], ok: true}); }
             else if (op === OPS.lineTo) { cx = c[j++]; cy = c[j++]; ruta += 'L' + P(cx, cy); const q = ap(st.ctm, cx, cy); if (geo.pt) { geo.segs.push([geo.pt[0], geo.pt[1], q[0], q[1]]); const sb = geo.subs[geo.subs.length - 1]; if (sb) { if (Math.abs(geo.pt[0] - q[0]) > 0.6 && Math.abs(geo.pt[1] - q[1]) > 0.6) sb.ok = false; sb.p.push(q); } } geo.pt = q; }
-            else if (op === OPS.curveTo) { geo.curva = true; ruta += 'C' + P(c[j], c[j + 1]) + ' ' + P(c[j + 2], c[j + 3]) + ' ' + P(c[j + 4], c[j + 5]); cx = c[j + 4]; cy = c[j + 5]; j += 6; }
+            else if (op === OPS.curveTo) { geo.curva = true; graf.curvas++; ruta += 'C' + P(c[j], c[j + 1]) + ' ' + P(c[j + 2], c[j + 3]) + ' ' + P(c[j + 4], c[j + 5]); cx = c[j + 4]; cy = c[j + 5]; j += 6; }
             else if (op === OPS.curveTo2) { geo.curva = true; ruta += 'C' + P(cx, cy) + ' ' + P(c[j], c[j + 1]) + ' ' + P(c[j + 2], c[j + 3]); cx = c[j + 2]; cy = c[j + 3]; j += 4; }
             else if (op === OPS.curveTo3) { geo.curva = true; ruta += 'C' + P(c[j], c[j + 1]) + ' ' + P(c[j + 2], c[j + 3]) + ' ' + P(c[j + 2], c[j + 3]); cx = c[j + 2]; cy = c[j + 3]; j += 4; }
             else if (op === OPS.closePath) { ruta += 'Z'; if (geo.pt && geo.ini) geo.segs.push([geo.pt[0], geo.pt[1], geo.ini[0], geo.ini[1]]); geo.pt = geo.ini; }
@@ -211,8 +214,30 @@ const PDFX = (() => {
         (e.s.length > 1 && e.len > 0 ? ' textLength="' + e.len + '" lengthAdjust="spacingAndGlyphs"' : '') + (e.ang ? ' transform="rotate(' + e.ang + ' ' + e.x + ' ' + e.y + ')"' : '') + '>' + escX(e.s) + '</text>';
     }
     const html = '<div class="pag" style="width:' + r1(W) + 'px;height:' + r1(H) + 'px"><svg viewBox="0 0 ' + r1(W) + ' ' + r1(H) + '" width="' + r1(W) + '" height="' + r1(H) + '">' + svg + '</svg></div>';
-    let real = null; try { CLS_CSS = new Map([...fuentes.values()].map(f => ['f' + f.n, f.css])); real = estructurar(out, W, H); } catch (e) { console.warn('PDF→HTML: página como dibujo', e); }
-    return {html: real || html, real: !!real, texto: textoPag.join(' ')};
+    // ¿documento de texto (Word/Excel) o página gráfica (diapositiva, gráfico, foto, diagrama)?
+    // Solo los de texto se reconstruyen como HTML; los gráficos se muestran fieles al PDF (imagen) con su texto
+    // encima, invisible pero seleccionable y buscable. Así ninguna página puede salir desordenada.
+    const area = W * H, nTxt = out.filter(e => e.t === 't').length;
+    graf.giros = out.filter(e => e.t === 't' && e.ang).length;
+    let motivo = '';
+    if (graf.sombra) motivo = 'degradados o tramas';
+    else if (graf.imgArea > area * 0.35) motivo = 'imágenes grandes';
+    else if (graf.curvas > 60) motivo = 'dibujos con curvas';
+    else if (nTxt < 3) motivo = 'casi sin texto';
+    else if (graf.giros > nTxt * 0.25) motivo = 'texto girado';
+    else if (graficos(out).some(z => (z[2] - z[0]) * (z[3] - z[1]) > area * 0.12)) motivo = 'gráfico de datos';
+    let real = null;
+    if (!motivo) { try { CLS_CSS = new Map([...fuentes.values()].map(f => ['f' + f.n, f.css])); real = estructurar(out, W, H); } catch (e) { motivo = 'error al reconstruir'; console.warn('PDF→HTML', e); } }
+    // autoverificación: si la reconstrucción tuvo que colocar mucho «por posición» (filas superpuestas) o como dibujo,
+    // la página no es un flujo de texto y una imagen fiel es más segura
+    if (real) { let alto = 0;
+      for (const m of real.matchAll(/class="pos" style="margin-top:[\d.]+px;height:([\d.]+)px/g)) alto += +m[1];
+      for (const m of real.matchAll(/<svg class="dib"[^>]*? width="([\d.]+)" height="([\d.]+)"/g)) if (+m[1] * +m[2] > area * 0.01) alto += +m[2];
+      if (alto > H * 0.3) { real = null; motivo = 'diseño libre (diapositiva o diagrama)'; } }
+    if (!real) { const img = await rasterizar(pg, W, H);
+      if (img) { const capa = out.filter(e => e.t === 't').map(e => textoSvg(e).replace('<text ', '<text fill-opacity="0" ').replace(/ fill="[^"]*"/, '')).join('');
+        return {html: '<div class="pag ras" style="width:' + r1(W) + 'px;height:' + r1(H) + 'px"><img src="' + img + '" alt="" width="' + r1(W) + '" height="' + r1(H) + '"><svg class="capa" viewBox="0 0 ' + r1(W) + ' ' + r1(H) + '" width="' + r1(W) + '" height="' + r1(H) + '">' + capa + '</svg></div>', real: false, motivo, texto: textoPag.join(' ')}; } }
+    return {html: real || html, real: !!real, motivo, texto: textoPag.join(' ')};
   }
 
 
@@ -618,20 +643,32 @@ const PDFX = (() => {
     return h;
   }
 
+  // página dibujada por PDF.js (fiel al original), 1,75× para que se vea nítida al acercar, en WebP
+  async function rasterizar(pg, W, H) {
+    try {
+      const k = 1.75, vp = pg.getViewport({scale: ESC * k});
+      const cv = document.createElement('canvas'); cv.width = Math.ceil(vp.width); cv.height = Math.ceil(vp.height);
+      const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height);
+      await pg.render({canvasContext: g, viewport: vp, background: '#ffffff'}).promise;
+      let u = cv.toDataURL('image/webp', 0.8); if (!u.startsWith('data:image/webp')) u = cv.toDataURL('image/jpeg', 0.85);
+      cv.width = cv.height = 0; return u;
+    } catch (e) { console.warn('PDF→HTML: no se pudo dibujar la página', e); return null; }
+  }
+  let MODOS = [];
   async function pdfAHtml(u8, titulo, alAvanzar) {
     iniciar();
-    const doc = await pdfjsLib.getDocument({data: u8.slice(), isEvalSupported: false, isOffscreenCanvasSupported: false, disableFontFace: true, fontExtraProperties: false, verbosity: 0}).promise;
-    const fuentes = new Map(), imgCache = new Map(); imgCache.urls = new Map(); ESTILOS = new Map(); let html = ''; const textos = [];
+    const doc = await pdfjsLib.getDocument({data: u8.slice(), isEvalSupported: false, isOffscreenCanvasSupported: false, disableFontFace: false, fontExtraProperties: true, verbosity: 0}).promise;
+    MODOS = []; const fuentes = new Map(), imgCache = new Map(); imgCache.urls = new Map(); ESTILOS = new Map(); let html = ''; const textos = [];
     for (let i = 1; i <= doc.numPages; i++) {
       const pg = await doc.getPage(i); const R = await pagina(pg, fuentes, imgCache);
-      html += R.html.replace('</div>', '<span class="npag">' + i + ' / ' + doc.numPages + '</span></div>'); textos.push(R.texto); pg.cleanup();
+      html += R.html.replace(/<\/div>$/, '<span class="npag">' + i + ' / ' + doc.numPages + '</span></div>'); textos.push(R.texto); MODOS.push(R.real ? 'html' : 'imagen' + (R.motivo ? ' (' + R.motivo + ')' : '')); pg.cleanup();
       if (alAvanzar) alAvanzar(i, doc.numPages);
     }
     await doc.destroy();
     const css = [...fuentes.values()].map(f => '.f' + f.n + '{' + f.css + '}').join('') + [...ESTILOS].map(([c, n]) => '.' + n + '{' + c + '}').join('');
     const page = '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>' + escX(titulo || '') + '</title><style>' +
       'body{margin:0;background:#e3e6ec;padding:24px 12px}.pag{position:relative;margin:0 auto 24px;background:#fff;box-shadow:0 1px 6px #0003;overflow:hidden}' +
-      '.pag svg{display:block}text{white-space:pre}' +
+      '.pag svg{display:block}text{white-space:pre}.pag.ras>img{display:block}.pag.ras>.capa{position:absolute;inset:0}.pag.ras text::selection{fill-opacity:1;fill:transparent;background:#3390ff55}' +
       '.pag.real{box-sizing:border-box;height:auto;overflow:visible;color:#000}.real p{margin:0;overflow-wrap:break-word}.real sup{line-height:0}.real .vi{display:inline-block;text-indent:0}' +
       '.real .bl{position:relative}.real .pos{position:relative}.real .pos>div{position:absolute}.real .pos>div{white-space:nowrap}' +
       '.real hr{margin:0;border:0;height:0}.real .im,.real .dib{display:block;overflow:visible}.real .caja{box-sizing:border-box}' +
@@ -640,7 +677,7 @@ const PDFX = (() => {
       '@media print{body{background:#fff;padding:0}.pag{box-shadow:none;margin:0;page-break-after:always}.npag{display:none}}' + css +
       '</style></head><body>' + (imgCache.urls.size ? '<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>' +
         [...imgCache.urls].map(([u, id]) => '<image id="' + id + '" width="1" height="1" preserveAspectRatio="none" href="' + u + '"/>').join('') + '</defs></svg>' : '') + html + '</body></html>';
-    return {page, texto: textos.join(' '), paginas: doc.numPages};
+    return {page, texto: textos.join(' '), paginas: doc.numPages, modos: MODOS.slice()};
   }
   return {pdfAHtml};
 })();

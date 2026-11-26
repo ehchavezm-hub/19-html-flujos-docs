@@ -569,6 +569,16 @@ async function construir(entradas, nombreCarpeta, opciones) {
     if (cfg && cfg.excepciones.some(x => coincide(x, e.ruta, false))) continue;
     if (await esPortal(e.file)) continue; validas.push(e);
   }
+  // PDF gemelo: «Informe.docx» + «Informe.pdf» en la misma carpeta → el PDF (exportado desde Office) es la vista fiel
+  // del Word/Excel/PowerPoint, y no se lista aparte. Sin gemelo se usa la conversión propia.
+  const tallo = r => r.toLowerCase().replace(/\.[^./]+$/, '');
+  const OFFICE = ['.docx', '.pptx', '.xlsx', '.xlsm', '.doc', '.ppt', '.xls'];
+  const pdfs = new Map(validas.filter(e => ext(e.ruta) === '.pdf').map(e => [tallo(e.ruta), e]));
+  const gemelo = new Map();
+  for (const e of validas) if (OFFICE.includes(ext(e.ruta)) && pdfs.has(tallo(e.ruta))) gemelo.set(e, pdfs.get(tallo(e.ruta)));
+  const usadosGem = new Set(gemelo.values());
+  for (let i = validas.length - 1; i >= 0; i--) if (usadosGem.has(validas[i])) validas.splice(i, 1);
+  if (gemelo.size) log('Vista fiel desde PDF del mismo nombre: ' + [...gemelo.keys()].map(e => e.ruta).join(', '));
   validas.sort((a, b) => a.ruta.toLowerCase().localeCompare(b.ruta.toLowerCase()));
   const todosArch = new Map(entradas.map(e => [e.ruta.toLowerCase(), e.file]));
   const idx = entradas.find(e => /^indice\.(xlsx|csv)$/i.test(e.ruta)) || null;
@@ -584,6 +594,7 @@ async function construir(entradas, nombreCarpeta, opciones) {
       if (rg.pendiente) { filas.push({archivo: '', titulo: rg.patron, seccion: rg.seccion, orden: String(++orden), estado: 'Pendiente'}); continue; }
       if (rg.archivo) {                 // archivo indicado en la columna C
         let e = validas.find(e => !asignados.has(e) && coincide(rg.archivo, e.ruta, false)) || validas.find(e => !asignados.has(e) && coincide(rg.archivo, e.ruta, true));
+        if (!e) for (const [of, pf] of gemelo) if (!asignados.has(of) && (coincide(rg.archivo, pf.ruta, false) || coincide(rg.archivo, pf.ruta, true))) { e = of; break; }   // el PDF gemelo representa a su original
         if (!e) { filas.push({archivo: '', titulo: rg.patron, seccion: rg.seccion, orden: String(++orden), estado: 'Pendiente'}); aviso('Configuración: el archivo «' + rg.archivo + '» (columna C) no está en la carpeta; «' + rg.patron + '» se muestra como pendiente.'); continue; }
         asignados.add(e); const m = meta.get(nrm(e.ruta.split('/').pop()).replace(/\.[^.]+$/, '')) || {};
         filas.push(Object.assign({}, m, {titulo: rg.patron !== rg.archivo ? rg.patron : (m.titulo || ''), archivo: e.ruta, seccion: rg.seccion, orden: String(++orden)})); continue;
@@ -646,8 +657,10 @@ async function construir(entradas, nombreCarpeta, opciones) {
         else if (tipo === 'html') { let t; try { t = new TextDecoder('utf-8', {fatal: true}).decode(u8); } catch (er) { t = new TextDecoder('windows-1252').decode(u8); }
           const R = await htmlConRecursos(t, e.ruta, todosArch); m.texto = R.texto; payload.push('<script type="text/plain" id="o-' + id + '">' + b64txt(R.page) + '<\/script>'); }
         else {
-          const x = ext(e.ruta); let R = null;
-          if (x === '.docx') R = await OX.docxAHtml(u8, d.titulo); else if (x === '.pptx') R = await OX.pptxAHtml(u8, d.titulo);
+          const x = ext(e.ruta); let R = null; const gem = gemelo.get(e);
+          if (gem) { try { R = await PDFX.pdfAHtml(new Uint8Array(await gem.file.arrayBuffer()), d.titulo); m.nota = 'Vista del PDF «' + gem.ruta.split('/').pop() + '» (mismo nombre): fiel al original. «Descargar original» baja el ' + ({word: 'Word', excel: 'Excel', ppt: 'PowerPoint'}[tipo] || 'archivo') + '.'; }
+            catch (er) { R = null; aviso(gem.ruta + ': no se pudo usar como vista (' + er.message + '); se convierte el original.'); } }
+          if (R) {} else if (x === '.docx') R = await OX.docxAHtml(u8, d.titulo); else if (x === '.pptx') R = await OX.pptxAHtml(u8, d.titulo);
           if (R && R.avisos && R.avisos.emf) aviso(e.ruta + ': ' + R.avisos.emf + ' imagen(es) en formato EMF/WMF que el navegador no puede mostrar (se ven como recuadro gris).'); else if (x === '.xlsx' || x === '.xlsm') R = await xlsxAHtml(u8, d.titulo);
           // el original de Word/Excel/PowerPoint no se copia dentro del portal (lo haría muy pesado): «Descargar original»
           // abre el archivo de la misma carpeta. Solo se incrusta si se marca la opción, o si no hay vista.
