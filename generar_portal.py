@@ -363,39 +363,41 @@ PLANTILLA = r'''<!doctype html>
 <title>__TITULO__</title>
 <meta name="generator" content="portal-documentos">
 <style>__FONTFACE__
-/* Portal de documentos · «hoja de plano» con color: azul de plano, acento naranja de seguridad, papel blanco.
-   Lo distintivo es el rótulo (cartela) de cada documento, como el de un plano. */
-:root{--tinta:#1b2733;--tinta2:#364656;--mut:#566575;--linea:#bfccd8;--linea2:#e0e7ee;--fondo:#edf2f6;--papel:#fff;
---azul:#1f3a56;--azul2:#2a4b6d;--azul-suave:#dbe6f1;--side-ink:#e9f0f6;--side-mut:#a7b8c9;
---acc:#d9540e;--acc-txt:#b8460a;--acc-suave:#fde9dc;--ok:#23743f;--ok-suave:#e1f2e6;--pend:#94600a;--pend-suave:#fbefd6;--r:6px;
---drawio:#2f6db5;--pdf:#c0392b;--html:#23743f;--word:#2b579a;--excel:#1f7a4a;--ppt:#c4511d;--pendiente:#94600a;--error:#8f1d1d}
+/* Portal de documentos · paleta AECOM (PALETAS_aecom.pptx), asignada por función:
+   Engineering Black #1A1A1A fondo oscuro · AECOM Orange #FF6600 acento (#CC4400 activo/botón, #E85500 CTA, #FF8833 realce)
+   Engineering Blue #003087 ingeniería/títulos · Corporate Blue #005A9C cabeceras · Blue Medium #0078C1 datos · Blue Light #5A9FD4 etiquetas
+   Grises #2E2E2E #555555 #6D6E71 #F2F2F2. Lo distintivo sigue siendo el rótulo de plano de cada documento. */
+:root{--tinta:#2E2E2E;--tinta2:#555555;--mut:#6D6E71;--linea:#D6D6D6;--linea2:#E0E0E0;--fondo:#F2F2F2;--papel:#fff;
+--side:#1A1A1A;--azul:#003087;--azul2:#005A9C;--azul-suave:#E6EEF7;--side-ink:#F2F2F2;--side-mut:#9A9B9D;
+--acc:#FF6600;--acc-btn:#CC4400;--acc-txt:#CC4400;--acc-suave:#FFF0E6;--ok:#1E6B3A;--ok-suave:#E3F1E8;--pend:#A33A00;--pend-suave:#FFE7D6;--r:4px;
+--drawio:#0078C1;--pdf:#CC4400;--html:#005A9C;--word:#003087;--excel:#1E6B3A;--ppt:#E85500;--pendiente:#FF8833;--error:#8F1D1D}
 *{box-sizing:border-box}[hidden]{display:none!important}html,body{height:100%;margin:0}
 body{font-family:__FONT__;color:var(--tinta);background:var(--fondo);display:grid;grid-template-columns:292px 1fr;overflow:hidden;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
 :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
-.salto{position:absolute;left:8px;top:-60px;z-index:20;background:var(--azul);color:#fff;padding:8px 12px;border-radius:var(--r);text-decoration:none;font-size:13px}.salto:focus{top:8px}
-/* ---- menú lateral (azul de plano, compacto) */
-aside{background:var(--azul);color:var(--side-ink);display:flex;flex-direction:column;min-height:0;border-top:4px solid var(--acc)}
+.salto{position:absolute;left:8px;top:-60px;z-index:20;background:var(--side);color:#fff;padding:8px 12px;border-radius:var(--r);text-decoration:none;font-size:13px}.salto:focus{top:8px}
+/* ---- menú lateral (Engineering Black, compacto) */
+aside{background:var(--side);color:var(--side-ink);display:flex;flex-direction:column;min-height:0;border-top:4px solid var(--acc)}
 .brand{padding:14px 16px 10px}
-.brand .proy{display:block;font-size:11.5px;font-weight:500;color:#f6a26b;margin-bottom:3px;letter-spacing:.01em}
+.brand .proy{display:block;font-size:11.5px;font-weight:500;color:#FF8833;margin-bottom:3px;letter-spacing:.01em}
 .brand b{display:block;font-size:17px;font-weight:600;letter-spacing:-.015em;line-height:1.2;color:#fff;text-wrap:balance}
 .brand em{display:block;font-style:normal;font-size:12.5px;color:var(--side-mut);margin-top:2px}
-.brand span{display:block;font-size:11px;color:#8ea3b8;margin-top:6px}
+.brand span{display:block;font-size:11px;color:var(--side-mut);margin-top:6px}
 .search{padding:2px 12px 6px;position:relative}
 .search svg{position:absolute;left:23px;top:11px;width:14px;height:14px;color:var(--side-mut);pointer-events:none}
 .search input{width:100%;padding:7px 10px 7px 30px;border-radius:var(--r);border:1px solid #ffffff2b;background:#ffffff14;color:#fff;font:inherit;font-size:13px;transition:border-color .15s,background-color .15s}
-.search input:hover{border-color:#ffffff4d}.search input:focus{outline:none;border-color:#f6a26b;background:#ffffff1f}.search input::placeholder{color:var(--side-mut)}
+.search input:hover{border-color:#ffffff4d}.search input:focus{outline:none;border-color:var(--acc);background:#ffffff1f}.search input::placeholder{color:var(--side-mut)}
 nav{overflow:auto;padding:0 6px 12px;flex:1;scrollbar-width:thin;scrollbar-color:#ffffff33 transparent;overscroll-behavior:contain}
-.sec{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:14px 8px 2px;padding-top:0;font-size:11.5px;font-weight:500;color:#9fc0e0}
+.sec{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:14px 8px 2px;padding-top:0;font-size:11.5px;font-weight:500;color:#5A9FD4}
 nav .sec:first-child{border-top:0;margin-top:4px;padding-top:2px}
-.sec i{font-style:normal;font-weight:400;font-size:11px;color:#7f97ae;font-variant-numeric:tabular-nums}
+.sec i{font-style:normal;font-weight:400;font-size:11px;color:var(--side-mut);font-variant-numeric:tabular-nums}
 nav a{position:relative;display:flex;gap:8px;align-items:baseline;padding:3px 8px 3px 10px;border-radius:4px;color:var(--side-ink);text-decoration:none;font-size:12.75px;line-height:1.3;transition:background-color .12s}
 nav a:hover{background:#ffffff14;color:#fff}
 nav a.on{background:#ffffff26;color:#fff;font-weight:500}
 nav a.on::before{content:"";position:absolute;left:0;top:3px;bottom:3px;width:3px;border-radius:0 2px 2px 0;background:var(--acc)}
 nav a .tt{flex:1;min-width:0}
 .dot{flex:none;width:7px;height:7px;border-radius:1px;background:var(--c,#8a949a);transform:translateY(-1px)}
-nav a.pend{color:var(--side-mut)}nav a.pend .dot{background:transparent;box-shadow:inset 0 0 0 1.5px #e7b45a}
-nav a .sub{flex:none;font-size:10px;font-weight:500;color:#e7b45a}
+nav a.pend{color:var(--side-mut)}nav a.pend .dot{background:transparent;box-shadow:inset 0 0 0 1.5px #FF8833}
+nav a .sub{flex:none;font-size:10px;font-weight:500;color:#FF8833}
 .foot{display:flex;gap:14px;font-size:11.5px;color:var(--side-mut);padding:9px 16px}.foot b{color:#fff;font-weight:500;font-variant-numeric:tabular-nums}
 .empty{padding:14px 10px;color:var(--side-mut);font-size:13px}
 /* ---- área de trabajo */
@@ -417,7 +419,7 @@ header.vh{background:var(--papel);border-bottom:1px solid var(--linea);padding:8
 button,.btn{font:inherit;font-size:13px;font-weight:500;min-height:34px;padding:7px 13px;border-radius:var(--r);border:1px solid var(--linea);background:var(--papel);color:var(--tinta);cursor:pointer;text-decoration:none;touch-action:manipulation;
 transition:border-color .12s,background-color .12s,transform .08s}
 button:hover,.btn:hover{border-color:var(--azul2);background:var(--azul-suave)}button:active{transform:translateY(1px)}
-#bDesc,#bDesc2{background:var(--acc);border-color:var(--acc);color:#fff}#bDesc:hover,#bDesc2:hover{background:var(--acc-txt);border-color:var(--acc-txt)}
+#bDesc,#bDesc2{background:var(--acc-btn);border-color:var(--acc-btn);color:#fff}#bDesc:hover,#bDesc2:hover{background:#A83800;border-color:#A83800}
 button[aria-pressed=true]{background:var(--acc);color:#fff;border-color:var(--acc)}
 .bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:6px 16px;background:var(--azul-suave);border-bottom:1px solid var(--linea2);font-size:12.5px;color:var(--mut)}
 .bar .grp{display:flex;gap:4px;align-items:center;padding-right:12px}.bar .grp:last-of-type{border-right:0}
@@ -430,14 +432,14 @@ button[aria-pressed=true]{background:var(--acc);color:#fff;border-color:var(--ac
 .frame iframe{border:0;width:100%;height:100%;display:block;background:#fff}.frame .zoomwrap{transform-origin:0 0;height:100%}
 /* ---- inicio: registro de documentos */
 .home{padding:30px 36px 48px;overflow:auto;max-width:1180px}
-.hero .proy{display:inline-block;font-size:13px;font-weight:500;color:#fff;background:var(--acc);border-radius:3px;padding:3px 9px;margin-bottom:10px}
+.hero .proy{display:inline-block;font-size:13px;font-weight:500;color:#1A1A1A;background:var(--acc);border-radius:3px;padding:3px 9px;margin-bottom:10px}
 .hero h1{margin:0;color:var(--azul);font-size:30px;letter-spacing:-.025em;line-height:1.12;font-weight:600;text-wrap:balance}
 .hero p{margin:8px 0 0;color:var(--tinta2);font-size:15px;max-width:68ch;text-wrap:pretty}.hero p b{font-weight:500;font-variant-numeric:tabular-nums}
 .grupo{margin-top:34px}
 .grupo h2{display:flex;align-items:baseline;gap:10px;font-size:16px;font-weight:600;margin:0 0 8px;letter-spacing:-.01em;color:var(--azul);padding-left:9px;border-left:3px solid var(--acc)}
 .grupo h2 i{font-style:normal;font-size:12.5px;font-weight:400;color:var(--mut);font-variant-numeric:tabular-nums}
 table.reg{width:100%;border-collapse:collapse;background:var(--papel);font-size:13.5px;border-radius:4px;overflow:hidden}
-.reg th{text-align:left;font-size:11px;font-weight:500;color:#fff;padding:6px 12px;background:var(--azul);white-space:nowrap}
+.reg th{text-align:left;font-size:11px;font-weight:500;color:#fff;padding:6px 12px;background:var(--azul2);white-space:nowrap}
 .reg td{padding:9px 12px;border-bottom:1px solid var(--linea2);vertical-align:top;font-variant-numeric:tabular-nums}
 .reg tr:last-child td{border-bottom:0}
 .reg td.n{width:44px;color:var(--mut)}.reg td.t{width:120px;white-space:nowrap}.reg td.r{width:64px}.reg td.f{width:104px;white-space:nowrap}.reg td.e{width:120px}
