@@ -402,33 +402,33 @@ nav a .sub{flex:none;font-size:10px;font-weight:500;color:#FF8833}
 .empty{padding:14px 10px;color:var(--side-mut);font-size:13px}
 /* ---- área de trabajo */
 main{display:flex;flex-direction:column;min-width:0;min-height:0}
-header.vh{background:var(--papel);border-bottom:1px solid var(--linea);padding:8px 16px;display:flex;gap:12px;align-items:center}
+header.vh{background:var(--papel);border-bottom:1px solid var(--linea);padding:5px 12px;display:flex;gap:12px;align-items:center}
 /* rótulo compacto: el título en la franja azul y los datos del plano en la misma línea */
-.rotulo{flex:1;min-width:0;display:flex;align-items:stretch;border:1px solid var(--linea);border-radius:3px;background:var(--papel);overflow:hidden;height:46px}
-.rotulo>div{padding:5px 12px;border-left:1px solid var(--linea2);min-width:0;display:flex;flex-direction:column;justify-content:center;flex:none}
-.rotulo small{display:block;font-size:10.5px;color:var(--mut);line-height:1.2}
-.rotulo b{display:block;font-size:12.5px;font-weight:400;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
-.rotulo .r-tit{border-left:0;background:var(--azul);color:#fff;padding:0 16px 0 14px;border-right:3px solid var(--acc);flex:0 1 auto;min-width:140px;max-width:44%}
-.rotulo h1{margin:0;font-size:16.5px;line-height:1.2;letter-spacing:-.01em;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rotulo{flex:1;min-width:0;display:flex;align-items:stretch;border:1px solid var(--linea);border-radius:3px;background:var(--papel);overflow:hidden;height:34px}
+.rotulo>div{padding:2px 10px;border-left:1px solid var(--linea2);min-width:0;display:flex;flex-direction:column;justify-content:center;flex:none}
+.rotulo small{display:block;font-size:9.5px;color:var(--mut);line-height:1.2}
+.rotulo b{display:block;font-size:11.5px;font-weight:400;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.rotulo .r-tit{border-left:0;background:var(--azul);color:#fff;padding:0 12px 0 10px;border-right:3px solid var(--acc);flex:0 1 auto;min-width:140px;max-width:44%}
+.rotulo h1{margin:0;font-size:13.5px;line-height:1.2;letter-spacing:-.01em;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rotulo .r-tit+div{border-left:0}
 .rotulo .r-arch{flex:1 1 120px;min-width:90px}.rotulo .r-arch b{font-weight:500;color:var(--tinta2)}
 .rotulo .r-est b{color:var(--ok)}.rotulo .r-est.p b{color:var(--pend)}
 .tipo{display:inline-flex;align-items:center;gap:6px;font-weight:500;color:var(--c)}.tipo::before{content:"";width:7px;height:7px;border-radius:1px;background:var(--c)}
 .actions{display:flex;gap:6px;align-items:center;flex:none}
-.bar .nota{margin-left:auto;font-size:11.5px;color:var(--acc-txt);max-width:52%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-button,.btn{font:inherit;font-size:13px;font-weight:500;min-height:34px;padding:7px 13px;border-radius:var(--r);border:1px solid var(--linea);background:var(--papel);color:var(--tinta);cursor:pointer;text-decoration:none;touch-action:manipulation;
+.bar .nota{margin-left:auto;font-size:10.5px;color:var(--acc-txt);max-width:52%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+button,.btn{font:inherit;font-size:12px;font-weight:500;min-height:28px;padding:4px 10px;border-radius:var(--r);border:1px solid var(--linea);background:var(--papel);color:var(--tinta);cursor:pointer;text-decoration:none;touch-action:manipulation;
 transition:border-color .12s,background-color .12s,transform .08s}
 button:hover,.btn:hover{border-color:var(--azul2);background:var(--azul-suave)}button:active{transform:translateY(1px)}
 #bDesc,#bDesc2{background:var(--acc-btn);border-color:var(--acc-btn);color:#fff}#bDesc:hover,#bDesc2:hover{background:#A83800;border-color:#A83800}
 button[aria-pressed=true]{background:var(--acc);color:#fff;border-color:var(--acc)}
-.bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:6px 16px;background:var(--azul-suave);border-bottom:1px solid var(--linea2);font-size:12.5px;color:var(--mut)}
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:3px 12px;background:var(--azul-suave);border-bottom:1px solid var(--linea2);font-size:11.5px;color:var(--mut)}
 .bar .grp{display:flex;gap:4px;align-items:center;padding-right:12px}.bar .grp:last-of-type{border-right:0}
-.bar button{min-height:30px;padding:4px 10px;font-size:12.5px;font-weight:500}#zl{min-width:46px;text-align:center;font-variant-numeric:tabular-nums}
+.bar button{min-height:24px;padding:2px 8px;font-size:11.5px;font-weight:500}#zl{min-width:40px;text-align:center;font-variant-numeric:tabular-nums}
 .tabs button[aria-selected=true]{background:var(--azul);color:#fff;border-color:var(--azul)}
 .note{margin:12px 24px 0;padding:9px 12px;background:var(--acc-suave);border-left:3px solid var(--acc);border-radius:2px;font-size:12.5px;color:#6b2c06}
-.canvas{flex:1;overflow:auto;margin:10px 16px 14px;background:var(--papel);border:1px solid var(--linea2);border-radius:2px;cursor:grab;position:relative;min-height:0;overscroll-behavior:contain}
+.canvas{flex:1;overflow:auto;margin:8px 12px 12px;background:var(--papel);border:1px solid var(--linea2);border-radius:2px;cursor:grab;position:relative;min-height:0;overscroll-behavior:contain}
 .canvas.drag{cursor:grabbing}.stage{transform-origin:0 0;width:max-content}.stage svg{display:block}
-.frame{flex:1;margin:10px 16px 14px;border:1px solid var(--linea2);border-radius:2px;overflow:auto;background:#e3e6e8;min-height:0}
+.frame{flex:1;margin:8px 12px 12px;border:1px solid var(--linea2);border-radius:2px;overflow:auto;background:#e3e6e8;min-height:0}
 .frame iframe{border:0;width:100%;height:100%;display:block;background:#fff}.frame .zoomwrap{transform-origin:0 0;height:100%}
 /* ---- inicio: registro de documentos */
 .home{padding:30px 36px 48px;overflow:auto;max-width:1180px}
