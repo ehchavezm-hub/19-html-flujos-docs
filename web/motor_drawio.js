@@ -226,57 +226,92 @@ const MD = (() => {
     const lo = Math.min(a[1], b[1]), hi = Math.max(a[1], b[1]); return a[0] > x0 + 0.5 && a[0] < x1 - 0.5 && hi > y0 + 0.5 && lo < y1 - 0.5;
   };
   const choca = (pts, obst) => { for (let j = 1; j < pts.length; j++) for (const r of obst) if (corta(pts[j - 1], pts[j], r)) return true; return false; };
-  function esquivar(pts, sb, tb, s, obst) {
-    if (!sb || !tb || !obst.length || !choca(pts, obst)) return pts;
-    const M = 10, DIR = {L: [-1, 0], R: [1, 0], T: [0, -1], B: [0, 1]};
-    const lados = (b, pre, p) => { const [cs] = constrained(b, s, pre); if (cs) return [[cs, p]];
-      return ['L', 'R', 'T', 'B'].map(sd => [sd, sidePoint(b, sd)]); };
-    const sal = lados(sb, 'exit', pts[0]), lle = lados(tb, 'entry', pts[pts.length - 1]);
-    const fuera = ([sd, p]) => [p[0] + DIR[sd][0] * M, p[1] + DIR[sd][1] * M];
+  // ctx: {segs: tramos ya trazados por otras flechas, puertos: puntos de llegada/salida ya usados}
+  function esquivar(pts, sb, tb, s, obst, ctx, libres = false) {
+    const M = 8, DIR = {L: [-1, 0], R: [1, 0], T: [0, -1], B: [0, 1]};
+    const r1_ = v => Math.round(v * 10) / 10;
+    // puertos candidatos: centro del lado y, si el lado es largo, otras posiciones; penalizados si ya están ocupados
+    const usado = p => ctx.puertos.some(q => Math.abs(q[0] - p[0]) < 7 && Math.abs(q[1] - p[1]) < 7);
+    const puertos = (b, pre) => {
+      const [cs, cp] = constrained(b, s, pre); if (cs) return [[cs, cp, 0]];
+      const out = [];
+      for (const sd of ['L', 'R', 'T', 'B']) { const largo = 'LR'.includes(sd) ? b[3] : b[2];
+        const fr = largo > 60 ? [0.5, 0.35, 0.65, 0.2, 0.8] : largo > 30 ? [0.5, 0.3, 0.7] : [0.5];
+        for (const f of fr) { const al = 'LR'.includes(sd) ? b[1] + b[3] * f : b[0] + b[2] * f; const p = sidePoint(b, sd, al);
+          out.push([sd, p, Math.abs(f - 0.5) * 60 + (usado(p) ? 400 : 0)]); } }
+      return out;
+    };
+    // se respetan el lado y el punto de salida y de llegada que tiene la flecha en draw.io
+    const ladoDe = (b, p) => Math.abs(p[0] - b[0]) < 0.6 ? 'L' : Math.abs(p[0] - b[0] - b[2]) < 0.6 ? 'R' : Math.abs(p[1] - b[1]) < 0.6 ? 'T' : 'B';
+    const p0 = pts[0].map(r1_), pn = pts[pts.length - 1].map(r1_);
+    // primero con los puntos de draw.io; solo si no hay paso posible se prueban otros lados (penalizados)
+    const sal = [[ladoDe(sb, p0), p0, 0], ...(libres ? puertos(sb, 'exit').map(x => [x[0], x[1].map(r1_), x[2] + 150]) : [])];
+    const lle = [[ladoDe(tb, pn), pn, 0], ...(libres ? puertos(tb, 'entry').map(x => [x[0], x[1].map(r1_), x[2] + 150]) : [])];
+    const fuera = ([sd, p]) => [r1_(p[0] + DIR[sd][0] * 3), r1_(p[1] + DIR[sd][1] * 3)];
     const todos = [...obst, sb, tb];
     const X = new Set(), Y = new Set();
-    for (const r of todos) { X.add(r[0] - M); X.add(r[0] + r[2] + M); Y.add(r[1] - M); Y.add(r[1] + r[3] + M); }
-    for (const pp of [...sal, ...lle]) { const q = fuera(pp); X.add(q[0]); Y.add(q[1]); X.add(pp[1][0]); Y.add(pp[1][1]); }
-    const xs = [...X].map(v => Math.round(v * 10) / 10).sort((a, b) => a - b), ys = [...Y].map(v => Math.round(v * 10) / 10).sort((a, b) => a - b);
-    const nx = xs.length, ny = ys.length; if (nx * ny > 40000) return pts;
-    const bloq = todos.map(r => r);   // las cajas de origen y destino tampoco se atraviesan
-    const libre = (a, b) => !bloq.some(r => corta(a, b, r, M - 1));
-    const dentro = p => bloq.some(r => p[0] > r[0] - M + 1 && p[0] < r[0] + r[2] + M - 1 && p[1] > r[1] - M + 1 && p[1] < r[1] + r[3] + M - 1);
+    for (const r of todos) { X.add(r1_(r[0] - M)); X.add(r1_(r[0] + r[2] + M)); Y.add(r1_(r[1] - M)); Y.add(r1_(r[1] + r[3] + M)); }
+    for (const pp of [...sal, ...lle]) { const q = fuera(pp); X.add(q[0]); Y.add(q[1]); }
+    // pasillos a medio camino entre cajas vecinas: las flechas van por el centro del hueco, no pegadas a una caja
+    const mitades = arr => { const v = [...arr].sort((a, b) => a - b); for (let i = 1; i < v.length; i++) if (v[i] - v[i - 1] > 4) arr.add(r1_((v[i] + v[i - 1]) / 2)); };
+    // huecos angostos entre cajas (p. ej. dos cuadros casi pegados): su línea central también es un pasillo
+    for (const r of todos) for (const o of todos) { if (r === o) continue;
+      const gx = o[0] - (r[0] + r[2]), gy = o[1] - (r[1] + r[3]);
+      if (gx > 1 && gx <= 2 * M) X.add(r1_(r[0] + r[2] + gx / 2)); if (gy > 1 && gy <= 2 * M) Y.add(r1_(r[1] + r[3] + gy / 2)); }
+    mitades(X); mitades(Y);
+    const xs = [...X].sort((a, b) => a - b), ys = [...Y].sort((a, b) => a - b);
+    const nx = xs.length, ny = ys.length; if (nx * ny > 60000) return pts;
+    const libre = (a, b) => !todos.some(r => corta(a, b, r, 1.5));
+    const dentro = p => todos.some(r => p[0] > r[0] - 1.5 && p[0] < r[0] + r[2] + 1.5 && p[1] > r[1] - 1.5 && p[1] < r[1] + r[3] + 1.5);
+    // costo por convivir con otras flechas: encimarse es muy caro, cruzarse cuesta algo
+    const convivencia = (a, b) => { let c = 0;
+      for (const [p, q] of ctx.segs) {
+        const ha = a[1] === b[1], hs = p[1] === q[1];
+        if (ha && hs && Math.abs(a[1] - p[1]) < 4) { const ov = Math.min(Math.max(a[0], b[0]), Math.max(p[0], q[0])) - Math.max(Math.min(a[0], b[0]), Math.min(p[0], q[0])); if (ov > 0) c += 60 + ov * 6; }
+        else if (!ha && !hs && Math.abs(a[0] - p[0]) < 4) { const ov = Math.min(Math.max(a[1], b[1]), Math.max(p[1], q[1])) - Math.max(Math.min(a[1], b[1]), Math.min(p[1], q[1])); if (ov > 0) c += 60 + ov * 6; }
+        else if (ha !== hs) { const [h1, h2, v1, v2] = ha ? [a, b, p, q] : [p, q, a, b];
+          if (v1[0] > Math.min(h1[0], h2[0]) + 1 && v1[0] < Math.max(h1[0], h2[0]) - 1 && h1[1] > Math.min(v1[1], v2[1]) + 1 && h1[1] < Math.max(v1[1], v2[1]) - 1) c += 35; } }
+      return c; };
+    const cerca = p => { let c = 0; for (const r of todos) { const dx = Math.max(r[0] - p[0], 0, p[0] - r[0] - r[2]), dy = Math.max(r[1] - p[1], 0, p[1] - r[1] - r[3]); const dd = Math.max(dx, dy); if (dd < M) c += (M - dd) * 2; } return c; };
     const ix = new Map(xs.map((v, i) => [v, i])), iy = new Map(ys.map((v, i) => [v, i]));
-    const key = (i, j, d) => (i * ny + j) * 4 + d;   // d: 0 der, 1 izq, 2 abajo, 3 arriba
-    const DV = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-    const dist = new Map(), prev = new Map(); const heap = [];
+    const key = (i, j, d) => (i * ny + j) * 4 + d, DV = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    const dist = new Map(), prev = new Map(), heap = [];
     const push = (c, k) => { heap.push([c, k]); let i = heap.length - 1; while (i) { const pa = (i - 1) >> 1; if (heap[pa][0] <= heap[i][0]) break; [heap[pa], heap[i]] = [heap[i], heap[pa]]; i = pa; } };
     const pop = () => { const t = heap[0], l = heap.pop(); if (heap.length) { heap[0] = l; let i = 0; for (;;) { const a = 2 * i + 1, b = a + 1; let m = i;
       if (a < heap.length && heap[a][0] < heap[m][0]) m = a; if (b < heap.length && heap[b][0] < heap[m][0]) m = b; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } } return t; };
     const dirDe = sd => ({R: 0, L: 1, B: 2, T: 3}[sd]);
-    for (const pp of sal) { const q = fuera(pp); const i = ix.get(Math.round(q[0] * 10) / 10), j = iy.get(Math.round(q[1] * 10) / 10);
-      if (i === undefined || j === undefined) continue; const k = key(i, j, dirDe(pp[0])); dist.set(k, M); prev.set(k, ['ini', pp]); push(M, k); }
+    for (const pp of sal) { const q = fuera(pp); const i = ix.get(q[0]), j = iy.get(q[1]); if (i === undefined || j === undefined) continue;
+      const k = key(i, j, dirDe(pp[0])), c0 = M + pp[2] + convivencia(pp[1], q); if (c0 < (dist.get(k) ?? 1e18)) { dist.set(k, c0); prev.set(k, ['ini', pp]); push(c0, k); } }
     const metas = new Map();
-    for (const pp of lle) { const q = fuera(pp); const i = ix.get(Math.round(q[0] * 10) / 10), j = iy.get(Math.round(q[1] * 10) / 10);
-      if (i !== undefined && j !== undefined) metas.set(i * ny + j, pp); }
-    const BEND = 40; let fin = null;
+    for (const pp of lle) { const q = fuera(pp); const i = ix.get(q[0]), j = iy.get(q[1]); if (i === undefined || j === undefined) continue;
+      const n = i * ny + j; if (!metas.has(n)) metas.set(n, []); metas.get(n).push(pp); }
+    const BEND = 45; let mejor = null, mejorC = 1e18;
     while (heap.length) {
-      const [c, k] = pop(); if (c > (dist.get(k) ?? 1e18)) continue;
+      const [c, k] = pop(); if (c > (dist.get(k) ?? 1e18)) continue; if (c >= mejorC) break;
       const d = k % 4, n = (k - d) / 4, i = Math.floor(n / ny), j = n % ny;
-      const meta = metas.get(n);
-      if (meta) { const llega = {L: 0, R: 1, T: 2, B: 3}[meta[0]]; if (d === llega) { fin = [k, meta]; break; } }
+      for (const pp of (metas.get(n) || [])) { const llega = {L: 0, R: 1, T: 2, B: 3}[pp[0]];
+        const tot = c + (d === llega ? 0 : BEND) + M + pp[2] + convivencia([xs[i], ys[j]], pp[1]);
+        if (tot < mejorC && (d === llega || (d ^ 1) !== llega || d >> 1 !== llega >> 1)) { mejorC = tot; mejor = [k, pp]; } }
       for (let nd = 0; nd < 4; nd++) {
-        if ((d ^ 1) === nd && d >> 1 === nd >> 1) continue;   // sin dar media vuelta
+        if ((d ^ 1) === nd && d >> 1 === nd >> 1) continue;
         const i2 = i + DV[nd][0], j2 = j + DV[nd][1]; if (i2 < 0 || j2 < 0 || i2 >= nx || j2 >= ny) continue;
         const a = [xs[i], ys[j]], b = [xs[i2], ys[j2]]; if (dentro(b) || !libre(a, b)) continue;
-        const k2 = key(i2, j2, nd), c2 = c + Math.abs(b[0] - a[0]) + Math.abs(b[1] - a[1]) + (nd !== d ? BEND : 0);
+        const k2 = key(i2, j2, nd), c2 = c + Math.abs(b[0] - a[0]) + Math.abs(b[1] - a[1]) + (nd !== d ? BEND : 0) + convivencia(a, b) + cerca(b);
         if (c2 < (dist.get(k2) ?? 1e18)) { dist.set(k2, c2); prev.set(k2, k); push(c2, k2); }
       }
     }
-    if (!fin) return pts;
-    const camino = []; let k = fin[0], ini = null;
-    while (true) { const d = k % 4, n = (k - d) / 4; camino.push([xs[Math.floor(n / ny)], ys[n % ny]]); const pk = prev.get(k); if (Array.isArray(pk) && pk[0] === 'ini') { ini = pk[1]; break; } k = pk; }
+    if (!mejor) return libres ? pts : esquivar(pts, sb, tb, s, obst, ctx, true);
+    const camino = []; let k = mejor[0], ini = null;
+    for (;;) { const d = k % 4, n = (k - d) / 4; camino.push([xs[Math.floor(n / ny)], ys[n % ny]]); const pk = prev.get(k); if (Array.isArray(pk) && pk[0] === 'ini') { ini = pk[1]; break; } k = pk; }
     camino.reverse();
-    const out = [ini[1], ...camino, fin[1][1]];
+    const pin = mejor[1][1], last = camino[camino.length - 1];
+    // el último tramo entra perpendicular al lado de llegada
+    const fin = 'LR'.includes(mejor[1][0]) ? [[last[0], pin[1]], pin] : [[pin[0], last[1]], pin];
+    const out = [ini[1], ...camino, ...fin];
     const limpio = [out[0]];
     for (const p of out.slice(1)) { const l = limpio[limpio.length - 1]; if (Math.abs(p[0] - l[0]) < 0.01 && Math.abs(p[1] - l[1]) < 0.01) continue; limpio.push(p); }
     for (let q = 1; q < limpio.length - 1;) { const a = limpio[q - 1], b = limpio[q], c = limpio[q + 1]; if ((a[0] === b[0] && b[0] === c[0]) || (a[1] === b[1] && b[1] === c[1])) limpio.splice(q, 1); else q++; }
+    for (let q = 1; q < limpio.length; q++) { const a = limpio[q - 1], b = limpio[q]; if (a[0] !== b[0] && a[1] !== b[1]) return pts; }   // seguridad: solo tramos rectos
     return limpio;
   }
   function pathD(pts, hops, r = 7, hr = 4.5) {
@@ -326,13 +361,20 @@ const MD = (() => {
       if ((!sb && !sp) || (!tb && !tp)) continue;
       let pts = route(sb, tb, wps, s, sp, tp);
       const obsE = sb && tb ? OBST.filter(o => o !== src && o !== tgt && !contiene(o, src) && !contiene(o, tgt)).map(o => B.get(o)) : [];
-      const antes = choca(pts, obsE); if (sb && tb) pts = esquivar(pts, sb, tb, s, obsE);
-      CRUCES.antes += antes ? 1 : 0; CRUCES.despues += choca(pts, obsE) ? 1 : 0;
       const lab = [...labelLines(c.value), ...(elabels.get(i) || [])];
-      E.push({id: i, s: sb ? src : null, t: tb ? tgt : null, pts, dash: s.dashed === '1', arrow: (s.endArrow || 'classic') !== 'none',
+      E.push({id: i, s: sb ? src : null, t: tb ? tgt : null, pts, _sb: sb, _tb: tb, _st: s, _obs: obsE, dash: s.dashed === '1', arrow: (s.endArrow || 'classic') !== 'none',
         startArrow: !['none', ''].includes(s.startArrow || 'none'), label: lab.join(' '), lx: gg ? (parseFloat(gg.getAttribute('x')) || 0) : 0});
       for (const p of pts) { xs.push(p[0]); ys.push(p[1]); }
     }
+    // segunda pasada: las flechas que atraviesan cajas se rehacen conociendo las demás (no encimarse, no compartir llegada)
+    { const tramos = e => e.pts.slice(1).map((q, j) => [e.pts[j], q]);
+      const malas = E.filter(e => e._sb && e._tb && choca(e.pts, e._obs)); CRUCES.antes = malas.length;
+      const ctx = {segs: [], puertos: []};
+      for (const e of E) if (!malas.includes(e)) { ctx.segs.push(...tramos(e)); ctx.puertos.push(e.pts[0], e.pts[e.pts.length - 1]); }
+      malas.sort((a, b) => a.pts.length - b.pts.length);
+      for (const e of malas) { e.pts = esquivar(e.pts, e._sb, e._tb, e._st, e._obs, ctx); ctx.segs.push(...tramos(e)); ctx.puertos.push(e.pts[0], e.pts[e.pts.length - 1]); }
+      CRUCES.despues = E.filter(e => e._sb && e._tb && choca(e.pts, e._obs)).length;
+      for (const e of malas) for (const p of e.pts) { xs.push(p[0]); ys.push(p[1]); } }
     if (!xs.length) { xs.push(0, 200); ys.push(0, 100); }
     const minx = Math.min(...xs) - 40, miny = Math.min(...ys) - 40, dx = -minx, dy = -miny;
     for (const [i, [x, y, w, h]] of B) B.set(i, [x + dx, y + dy, w, h]);
