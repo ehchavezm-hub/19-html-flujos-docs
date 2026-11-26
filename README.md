@@ -24,7 +24,7 @@ Si la carpeta está en Google Drive, usa la carpeta sincronizada en la PC (Googl
 | `.drawio` | Dibujo con sus colores y formas originales; varias páginas, zoom, arrastre y **paso a paso** |
 | `.pdf` | **Reconstruido como HTML real**: párrafos (`<p>`) con su alineación, negritas y colores; tablas como `<table>` (filas, columnas, celdas combinadas, bordes y fondos); imágenes en su lugar. Solo lo que es dibujo (logos vectoriales, texto girado) queda como SVG. Ya no se incrusta el PDF |
 | `.html` | Aislado, con sus imágenes y estilos incrustados |
-| Word `.docx` | Textos, títulos, listas, tablas e imágenes |
+| Word `.docx` | Textos, títulos, listas, tablas e imágenes (las EMF/WMF que llevan dentro una imagen común se muestran; las solo vectoriales quedan como recuadro) |
 | Excel `.xlsx` / `.xlsm` | Tablas por hoja: valores, colores, celdas combinadas (sin formato condicional ni gráficos) |
 | PowerPoint `.pptx` | Diapositivas con textos, imágenes y tablas en su posición |
 | `.doc` / `.xls` / `.ppt` antiguos | Solo para descargar (guárdalos como `.docx` / `.xlsx` / `.pptx` para verlos) |

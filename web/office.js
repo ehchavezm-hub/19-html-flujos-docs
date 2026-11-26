@@ -200,6 +200,59 @@ const OX = (() => {
       return {b: new Uint8Array(await out.arrayBuffer()), m: 'image/webp'};
     } catch (e) { return null; }
   }
+  // EMF/WMF: el navegador no los dibuja. Muchos (logos pegados en Word) llevan dentro una imagen común:
+  // un PNG/JPG incrustado (EMF+) o un mapa de bits (DIB) en un registro StretchDIBits/BitBlt. Se extrae esa imagen.
+  function dibAPng(u8, off) {
+    const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+    const hs = dv.getUint32(off, true); if (hs < 12 || off + hs > u8.length) return null;
+    let w, h, bpp, comp = 0, clr = 0;
+    if (hs === 12) { w = dv.getUint16(off + 4, true); h = dv.getInt16(off + 6, true); bpp = dv.getUint16(off + 10, true); }
+    else { w = dv.getInt32(off + 4, true); h = dv.getInt32(off + 8, true); bpp = dv.getUint16(off + 14, true); comp = dv.getUint32(off + 16, true); clr = hs >= 36 ? dv.getUint32(off + 32, true) : 0; }
+    if (!w || !h || w > 12000 || Math.abs(h) > 12000) return null;
+    const pal = []; const nPal = bpp <= 8 ? (clr || (1 << bpp)) : 0; let p = off + hs + (comp === 3 && hs === 40 ? 12 : 0);
+    for (let i = 0; i < nPal; i++, p += hs === 12 ? 3 : 4) pal.push([u8[p + 2], u8[p + 1], u8[p]]);
+    if (comp === 4 || comp === 5) return {datos: u8.subarray(p), mime: comp === 4 ? 'image/jpeg' : 'image/png'};
+    if (comp !== 0 && comp !== 3) return null;
+    const abajo = h > 0, H = Math.abs(h), fila = ((w * bpp + 31) >> 5) * 4; if (p + fila * H > u8.length + fila) return null;
+    const id = new ImageData(w, H); const o = id.data; let alfa = false;
+    for (let y = 0; y < H; y++) { const r = p + (abajo ? H - 1 - y : y) * fila;
+      for (let x = 0; x < w; x++) { const k = (y * w + x) * 4; let c;
+        if (bpp === 32) { o[k] = u8[r + x * 4 + 2]; o[k + 1] = u8[r + x * 4 + 1]; o[k + 2] = u8[r + x * 4]; o[k + 3] = u8[r + x * 4 + 3]; if (u8[r + x * 4 + 3]) alfa = true; continue; }
+        if (bpp === 24) { o[k] = u8[r + x * 3 + 2]; o[k + 1] = u8[r + x * 3 + 1]; o[k + 2] = u8[r + x * 3]; o[k + 3] = 255; continue; }
+        if (bpp === 8) c = pal[u8[r + x]]; else if (bpp === 4) c = pal[(u8[r + (x >> 1)] >> (x & 1 ? 0 : 4)) & 15]; else if (bpp === 1) c = pal[(u8[r + (x >> 3)] >> (7 - (x & 7))) & 1]; else return null;
+        c = c || [0, 0, 0]; o[k] = c[0]; o[k + 1] = c[1]; o[k + 2] = c[2]; o[k + 3] = 255; } }
+    if (bpp === 32 && !alfa) for (let i = 3; i < o.length; i += 4) o[i] = 255;    // 32 bits sin alfa real: opaco
+    return {imagen: id};
+  }
+  async function metaArchivoAImagen(u8) {
+    try {
+      // 1) PNG o JPG incrustado (EMF+)
+      const busca = (sig, desde) => { outer: for (let i = desde; i < u8.length - sig.length; i++) { for (let j = 0; j < sig.length; j++) if (u8[i + j] !== sig[j]) continue outer; return i; } return -1; };
+      const ip = busca([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A], 0);
+      if (ip >= 0) { const fin = busca([0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82], ip); if (fin > 0) return {datos: u8.subarray(ip, fin + 8), mime: 'image/png'}; }
+      const ij = busca([0xFF, 0xD8, 0xFF], 0);
+      if (ij >= 0) { let fin = -1; for (let i = u8.length - 2; i > ij; i--) if (u8[i] === 0xFF && u8[i + 1] === 0xD9) { fin = i; break; } if (fin > 0) return {datos: u8.subarray(ij, fin + 2), mime: 'image/jpeg'}; }
+      // 2) mapas de bits en registros EMF o WMF: el más grande
+      const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength); const cand = [];
+      if (dv.getUint32(0, true) === 1 && dv.getUint32(40, true) === 0x464D4520) {           // EMF
+        for (let p = 0; p + 8 <= u8.length;) { const t = dv.getUint32(p, true), n = dv.getUint32(p + 4, true); if (n < 8) break;
+          if (t === 81 && n > 80) cand.push(p + dv.getUint32(p + 48, true));                    // StretchDIBits
+          else if ((t === 76 || t === 77) && n > 100 && dv.getUint32(p + 88, true)) cand.push(p + dv.getUint32(p + 84, true)); // BitBlt / StretchBlt
+          p += n; }
+      } else {                                                                                  // WMF (con o sin cabecera «placeable»)
+        let p = dv.getUint32(0, true) === 0x9AC6CDD7 ? 22 : 0; p += dv.getUint16(p + 2, true) * 2;
+        for (; p + 6 <= u8.length;) { const n = dv.getUint32(p, true) * 2, f = dv.getUint16(p + 4, true); if (n < 6) break;
+          if (f === 0x0F43) cand.push(p + 28); else if (f === 0x0B41) cand.push(p + 26); else if (f === 0x0940 && n > 40) cand.push(p + 22);
+          p += n; }
+      }
+      let mejor = null, area = 0;
+      for (const off of cand) { const r = dibAPng(u8, off); if (!r) continue; const a = r.imagen ? r.imagen.width * r.imagen.height : 1e9; if (a > area) { mejor = r; area = a; } }
+      if (!mejor) return null;
+      if (mejor.datos) return mejor;
+      const cv = new OffscreenCanvas(mejor.imagen.width, mejor.imagen.height); cv.getContext('2d').putImageData(mejor.imagen, 0, 0);
+      const b = await cv.convertToBlob({type: 'image/png'}); return {datos: new Uint8Array(await b.arrayBuffer()), mime: 'image/png'};
+    } catch (e) { return null; }
+  }
   function lectorImagenes(z, avisos) {
     const cache = new Map();
     return async (rels, blipFill, dims) => {
@@ -211,6 +264,10 @@ const OX = (() => {
       let u = null; const m = mimeDe(t);
       if (m && z.tiene(t)) { let b = await z.bytes(t); let mm = m; const r = await reducirImagen(b, m); if (r) { b = r.b; mm = r.m; }
         let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); u = 'data:' + mm + ';base64,' + btoa(s); }
+      else if (/\.(emf|wmf)$/i.test(t) && z.tiene(t)) { const r = await metaArchivoAImagen(await z.bytes(t));
+        if (r) { let b = r.datos, mm = r.mime; const rr = await reducirImagen(b, mm); if (rr) { b = rr.b; mm = rr.m; }
+          let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); u = 'data:' + mm + ';base64,' + btoa(s); }
+        else avisos.emf = (avisos.emf || 0) + 1; }
       else if (/\.(emf|wmf|tif|tiff)$/i.test(t)) avisos.emf = (avisos.emf || 0) + 1;
       cache.set(t, u); return u;
     };

@@ -768,6 +768,59 @@ const OX = (() => {
       return {b: new Uint8Array(await out.arrayBuffer()), m: 'image/webp'};
     } catch (e) { return null; }
   }
+  // EMF/WMF: el navegador no los dibuja. Muchos (logos pegados en Word) llevan dentro una imagen común:
+  // un PNG/JPG incrustado (EMF+) o un mapa de bits (DIB) en un registro StretchDIBits/BitBlt. Se extrae esa imagen.
+  function dibAPng(u8, off) {
+    const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+    const hs = dv.getUint32(off, true); if (hs < 12 || off + hs > u8.length) return null;
+    let w, h, bpp, comp = 0, clr = 0;
+    if (hs === 12) { w = dv.getUint16(off + 4, true); h = dv.getInt16(off + 6, true); bpp = dv.getUint16(off + 10, true); }
+    else { w = dv.getInt32(off + 4, true); h = dv.getInt32(off + 8, true); bpp = dv.getUint16(off + 14, true); comp = dv.getUint32(off + 16, true); clr = hs >= 36 ? dv.getUint32(off + 32, true) : 0; }
+    if (!w || !h || w > 12000 || Math.abs(h) > 12000) return null;
+    const pal = []; const nPal = bpp <= 8 ? (clr || (1 << bpp)) : 0; let p = off + hs + (comp === 3 && hs === 40 ? 12 : 0);
+    for (let i = 0; i < nPal; i++, p += hs === 12 ? 3 : 4) pal.push([u8[p + 2], u8[p + 1], u8[p]]);
+    if (comp === 4 || comp === 5) return {datos: u8.subarray(p), mime: comp === 4 ? 'image/jpeg' : 'image/png'};
+    if (comp !== 0 && comp !== 3) return null;
+    const abajo = h > 0, H = Math.abs(h), fila = ((w * bpp + 31) >> 5) * 4; if (p + fila * H > u8.length + fila) return null;
+    const id = new ImageData(w, H); const o = id.data; let alfa = false;
+    for (let y = 0; y < H; y++) { const r = p + (abajo ? H - 1 - y : y) * fila;
+      for (let x = 0; x < w; x++) { const k = (y * w + x) * 4; let c;
+        if (bpp === 32) { o[k] = u8[r + x * 4 + 2]; o[k + 1] = u8[r + x * 4 + 1]; o[k + 2] = u8[r + x * 4]; o[k + 3] = u8[r + x * 4 + 3]; if (u8[r + x * 4 + 3]) alfa = true; continue; }
+        if (bpp === 24) { o[k] = u8[r + x * 3 + 2]; o[k + 1] = u8[r + x * 3 + 1]; o[k + 2] = u8[r + x * 3]; o[k + 3] = 255; continue; }
+        if (bpp === 8) c = pal[u8[r + x]]; else if (bpp === 4) c = pal[(u8[r + (x >> 1)] >> (x & 1 ? 0 : 4)) & 15]; else if (bpp === 1) c = pal[(u8[r + (x >> 3)] >> (7 - (x & 7))) & 1]; else return null;
+        c = c || [0, 0, 0]; o[k] = c[0]; o[k + 1] = c[1]; o[k + 2] = c[2]; o[k + 3] = 255; } }
+    if (bpp === 32 && !alfa) for (let i = 3; i < o.length; i += 4) o[i] = 255;    // 32 bits sin alfa real: opaco
+    return {imagen: id};
+  }
+  async function metaArchivoAImagen(u8) {
+    try {
+      // 1) PNG o JPG incrustado (EMF+)
+      const busca = (sig, desde) => { outer: for (let i = desde; i < u8.length - sig.length; i++) { for (let j = 0; j < sig.length; j++) if (u8[i + j] !== sig[j]) continue outer; return i; } return -1; };
+      const ip = busca([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A], 0);
+      if (ip >= 0) { const fin = busca([0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82], ip); if (fin > 0) return {datos: u8.subarray(ip, fin + 8), mime: 'image/png'}; }
+      const ij = busca([0xFF, 0xD8, 0xFF], 0);
+      if (ij >= 0) { let fin = -1; for (let i = u8.length - 2; i > ij; i--) if (u8[i] === 0xFF && u8[i + 1] === 0xD9) { fin = i; break; } if (fin > 0) return {datos: u8.subarray(ij, fin + 2), mime: 'image/jpeg'}; }
+      // 2) mapas de bits en registros EMF o WMF: el más grande
+      const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength); const cand = [];
+      if (dv.getUint32(0, true) === 1 && dv.getUint32(40, true) === 0x464D4520) {           // EMF
+        for (let p = 0; p + 8 <= u8.length;) { const t = dv.getUint32(p, true), n = dv.getUint32(p + 4, true); if (n < 8) break;
+          if (t === 81 && n > 80) cand.push(p + dv.getUint32(p + 48, true));                    // StretchDIBits
+          else if ((t === 76 || t === 77) && n > 100 && dv.getUint32(p + 88, true)) cand.push(p + dv.getUint32(p + 84, true)); // BitBlt / StretchBlt
+          p += n; }
+      } else {                                                                                  // WMF (con o sin cabecera «placeable»)
+        let p = dv.getUint32(0, true) === 0x9AC6CDD7 ? 22 : 0; p += dv.getUint16(p + 2, true) * 2;
+        for (; p + 6 <= u8.length;) { const n = dv.getUint32(p, true) * 2, f = dv.getUint16(p + 4, true); if (n < 6) break;
+          if (f === 0x0F43) cand.push(p + 28); else if (f === 0x0B41) cand.push(p + 26); else if (f === 0x0940 && n > 40) cand.push(p + 22);
+          p += n; }
+      }
+      let mejor = null, area = 0;
+      for (const off of cand) { const r = dibAPng(u8, off); if (!r) continue; const a = r.imagen ? r.imagen.width * r.imagen.height : 1e9; if (a > area) { mejor = r; area = a; } }
+      if (!mejor) return null;
+      if (mejor.datos) return mejor;
+      const cv = new OffscreenCanvas(mejor.imagen.width, mejor.imagen.height); cv.getContext('2d').putImageData(mejor.imagen, 0, 0);
+      const b = await cv.convertToBlob({type: 'image/png'}); return {datos: new Uint8Array(await b.arrayBuffer()), mime: 'image/png'};
+    } catch (e) { return null; }
+  }
   function lectorImagenes(z, avisos) {
     const cache = new Map();
     return async (rels, blipFill, dims) => {
@@ -779,6 +832,10 @@ const OX = (() => {
       let u = null; const m = mimeDe(t);
       if (m && z.tiene(t)) { let b = await z.bytes(t); let mm = m; const r = await reducirImagen(b, m); if (r) { b = r.b; mm = r.m; }
         let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); u = 'data:' + mm + ';base64,' + btoa(s); }
+      else if (/\.(emf|wmf)$/i.test(t) && z.tiene(t)) { const r = await metaArchivoAImagen(await z.bytes(t));
+        if (r) { let b = r.datos, mm = r.mime; const rr = await reducirImagen(b, mm); if (rr) { b = rr.b; mm = rr.m; }
+          let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); u = 'data:' + mm + ';base64,' + btoa(s); }
+        else avisos.emf = (avisos.emf || 0) + 1; }
       else if (/\.(emf|wmf|tif|tiff)$/i.test(t)) avisos.emf = (avisos.emf || 0) + 1;
       cache.set(t, u); return u;
     };
@@ -1845,7 +1902,8 @@ const PDFX = (() => {
     const its = items.slice().sort((a, b) => a.y - b.y || a.x - b.x);
     const lns = [];
     for (const t of its) {
-      let l = null; for (let k = lns.length - 1; k >= 0 && k >= lns.length - 4; k--) { const m = lns[k]; if (Math.abs(m.y - t.y) < Math.max(m.sz, t.sz) * 0.38) { l = m; break; } }
+      // el renglón con la altura más cercana (una viñeta de otra fuente suele estar algo más arriba o abajo)
+      let l = null, dmin = 1e9; for (let k = lns.length - 1; k >= 0 && k >= lns.length - 4; k--) { const m = lns[k]; const dy = Math.abs(m.y - t.y); if (dy < Math.max(m.sz, t.sz) * 0.38 && dy < dmin) { l = m; dmin = dy; } }
       if (!l) { l = {y: t.y, sz: t.sz, its: []}; lns.push(l); }
       l.its.push(t); if (t.sz > l.sz) { l.sz = t.sz; l.y = t.y; }
     }
@@ -1853,20 +1911,38 @@ const PDFX = (() => {
       l.its.sort((a, b) => a.x - b.x); l.segs = [];
       for (const t of l.its) { const s = l.segs[l.segs.length - 1];
         if (s && t.x - s.x1 < Math.max(l.sz * 1.6, 8)) { s.its.push(t); s.x1 = Math.max(s.x1, t.x + t.len); } else l.segs.push({x0: t.x, x1: t.x + t.len, its: [t]}); }
+      // viñeta o número de lista separado de su texto por una tabulación: un solo elemento de lista
+      const i0 = l.segs[0].its[0], i1 = l.segs[0].its[1];
+      // viñeta como texto aparte dentro del mismo tramo («•» y, a cierta distancia, el texto)
+      if (i1 && /^[•▪◦●■◆►✓\-–·o\uf0b7\uf0a7\uf076\uf0d8\uf0fc]$/.test(i0.s.trim()) && i1.x - (i0.x + i0.len) > i0.sz * 0.5) {
+        l.vin = {txt: i0.s.trim().replace(/^[\uf0b7\uf0a7\uf076\uf0d8\uf0fc]$/, '•'), x: i0.x, cls: i0.cls, col: i0.col};
+        l.segs[0] = {x0: i1.x, x1: l.segs[0].x1, its: l.segs[0].its.slice(1)};
+      }
+      const s0 = l.segs[0].its.map(t => t.s).join('').trim();
+      if (!l.vin && l.segs.length > 1 && /^([•▪◦●■◆►✓\-–·o\uf0b7\uf0a7\uf076\uf0d8\uf0fc]|\d{1,2}[.)]|[a-zA-Z][.)]|\d+(\.\d+)+\.?)$/.test(s0)) {
+        l.vin = {txt: s0.replace(/^[\uf0b7\uf0a7\uf076\uf0d8\uf0fc]$/, '•'), x: l.segs[0].x0, cls: l.segs[0].its[0].cls, col: l.segs[0].its[0].col};
+        l.segs = l.segs.slice(1); if (l.segs.length > 1) l.segs = [{x0: l.segs[0].x0, x1: l.segs[l.segs.length - 1].x1, its: l.segs.flatMap(s => s.its)}];
+      }
       l.x0 = l.segs[0].x0; l.x1 = Math.max(...l.segs.map(s => s.x1));
     }
     lns.sort((a, b) => a.y - b.y);
     const izq = caja ? caja[0] : Math.min(...lns.map(l => l.x0)), der = caja ? caja[2] : Math.max(...lns.map(l => l.x1)), centro = (izq + der) / 2;
+    // margen derecho real: el borde que comparten más renglones largos (el texto justificado termina ahí)
+    const largos = lns.filter(l => l.x1 - l.x0 > (der - izq) * 0.55); const cuenta = new Map();
+    for (const l of largos) { const k = Math.round(l.x1 / 3); cuenta.set(k, (cuenta.get(k) || 0) + 1); }
+    const moda = [...cuenta].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0];
+    let derLin = moda && moda[1] >= 2 ? moda[0] * 3 : Math.max(...lns.map(l => l.x1));
+    if (caja) derLin = Math.min(caja[2] - 2, derLin);
     const out = []; let P = null;
-    const viñeta = s => /^\s*([•●▪■◦○\-–—]|\d{1,2}[.)]|[a-z][.)])\s/.test(s);
+    const viñeta = s => /^\s*([•●▪■◦○\-–—]|\d{1,2}[.)]|[a-z][.)])(\s|$)/.test(s);
     const cerrar = () => {
       if (!P) return; const L = P.lineas;
       const xs0 = L.map(l => l.x0), xs1 = L.map(l => l.x1), cs = L.map(l => (l.x0 + l.x1) / 2);
       const rango = v => Math.max(...v) - Math.min(...v); let bz = null; const base0 = () => bz || (bz = estiloBase(L));
       let al = 'left';
       const tc = Math.max(3, base0().sz * 0.45);
-      if (L.length > 1) { if (rango(cs) < tc && rango(xs0) > tc) al = 'center'; else if (rango(xs1) < 3 && rango(xs0) > 3) al = 'right'; else if (L.length > 2 && rango(xs0.slice(1)) < 3 && rango(xs1.slice(0, -1)) < 3) al = 'justify'; }
-      else { const l = L[0]; if (Math.abs((l.x0 + l.x1) / 2 - centro) < (caja ? Math.max(3, l.sz * 0.35) : 4) && l.x0 > izq + (caja ? 3 : 15)) al = 'center'; else if (Math.abs(l.x1 - der) < (caja ? 3 : 4) && l.x0 > izq + (der - izq) * 0.3) al = 'right'; }
+      if (L.length > 1) { if (!L[0].vin && rango(cs) < tc && rango(xs0) > tc) al = 'center'; else if (rango(xs1) < 3 && rango(xs0) > 3) al = 'right'; else if (L.length > 2 && rango(xs0.slice(1)) < 3 && rango(xs1.slice(0, -1)) < 3) al = 'justify'; }
+      else { const l = L[0]; if (!l.vin && (caja || l.x1 - l.x0 < (der - izq) * 0.85) && Math.abs((l.x0 + l.x1) / 2 - centro) < (caja ? Math.max(3, l.sz * 0.35) : 4) && l.x0 > izq + (caja ? 3 : 15)) al = 'center'; else if (Math.abs(l.x1 - der) < (caja ? 3 : 4) && l.x0 > izq + (der - izq) * 0.3) al = 'right'; }
       const x0 = Math.min(...xs0), x1 = Math.max(...xs1);
       const base = base0();
       const paso = L.length > 1 ? (L[L.length - 1].y - L[0].y) / (L.length - 1) : base.sz * 1.2;
@@ -1877,22 +1953,33 @@ const PDFX = (() => {
       const st = ['font-size:' + px(base.sz), 'line-height:' + r2(lh)]; if (base.col !== '#000000') st.push('color:' + base.col);
       if (al !== 'left') st.push('text-align:' + al); if (sangria) st.push('text-indent:' + px(sangria)); if (L.length === 1 && !caja) st.push('white-space:nowrap');
       if (caja && al === 'left' && x0 - caja[0] > 8 && x0 - caja[0] < (caja[2] - caja[0]) * 0.35) st.push('padding-left:' + px(x0 - caja[0] - 3));
+      const vin = L[0].vin; let x0v = x0;
+      if (vin) { const sep = Math.max(4, L[0].x0 - vin.x); x0v = vin.x;
+        txt = '<span class="vi" style="width:' + px(sep) + (vin.cls !== base.cls ? '' : '') + '">' + escX(vin.txt) + '</span>' + txt;
+        const k = st.findIndex(z => z.startsWith('text-indent')); if (k >= 0) st.splice(k, 1);
+        st.push('padding-left:' + px(sep), 'text-indent:' + px(-sep)); if (al === 'justify' || al === 'left') {} }
       const top = L[0].y - base.sz * (0.5 + lh / 2) + base.sz * 0.15, bot = L[L.length - 1].y + base.sz * (lh / 2 - 0.35);
-      out.push({bb: [al === 'center' && !caja ? Math.min(x0, izq) : x0, top, al === 'center' && !caja ? Math.max(x1, der) : x1, bot], propio: [x0, top, x1, bot], tipo: 'p',
-        ancho: L.length > 1 && al !== 'center' ? x1 - x0 + base.sz * 1.5 : 0,
+      out.push({bb: [al === 'center' && !caja ? Math.min(x0v, izq) : x0v, top, al === 'center' && !caja ? Math.max(x1, der) : x1, bot], propio: [x0v, top, x1, bot], tipo: 'p',
+        ancho: L.length > 1 && al !== 'center' ? x1 - x0v + base.sz * 1.5 : 0,
         multi: L.length > 1, html: '<p class="' + base.cls + ' ' + clase(st.join(';')) + '">' + txt + '</p>'});
       P = null;
     };
     for (const l of lns) {
-      if (l.segs.length > 1 && !caja) {           // línea con columnas separadas (p. ej. «REFERENCIA ……  CUI N°…»): cada parte por su lado
+      if (l.segs.length > 1 && !caja && !l.vin) {           // línea con columnas separadas (p. ej. «REFERENCIA ……  CUI N°…»): cada parte por su lado
         cerrar();
         for (const s of l.segs) { const sub = {y: l.y, sz: l.sz, segs: [s], x0: s.x0, x1: s.x1, its: s.its}; P = {lineas: [sub]}; cerrar(); }
         continue;
       }
       if (l.segs.length > 1) { const s0 = l.segs; l.segs = [{x0: s0[0].x0, x1: s0[s0.length - 1].x1, its: s0.flatMap(s => s.its), hueco: true}]; }
       const u = P && P.lineas[P.lineas.length - 1];
-      const sigue = u && Math.abs(l.sz - u.sz) <= Math.max(0.8, u.sz * 0.12) && l.y - u.y <= u.sz * (caja ? 2.4 : 1.75) && l.y - u.y >= u.sz * 0.7 &&
-        !viñeta(l.segs[0].its[0].s) && (Math.abs(l.x0 - u.x0) < 3 || Math.abs((l.x0 + l.x1) / 2 - (u.x0 + u.x1) / 2) < Math.max(3, u.sz * 0.45) || (P.lineas.length === 1 && u.x0 - l.x0 > 3 && u.x0 - l.x0 < 60) || (P.lineas.length > 1 && Math.abs(l.x0 - P.lineas[1].x0) < 3)) &&
+      // un renglón que no llega al margen derecho cierra su párrafo (en Word, el que continúa llena el ancho);
+      // los renglones con puntos guía (índices) van siempre solos
+      const txtL = x => x.segs.map(sg => sg.its.map(t => t.s).join(' ')).join(' ');
+      const guia = x => /(\.\s?){5,}|…{2,}|_{5,}/.test(txtL(x));
+      const centrada = u && Math.abs((l.x0 + l.x1) / 2 - (u.x0 + u.x1) / 2) < Math.max(3, u.sz * 0.45) && Math.abs(l.x0 - u.x0) > 3;
+      const llena = u && (u.x1 >= derLin - Math.max(u.sz * 2.2, 10) || centrada);
+      const sigue = u && llena && !guia(u) && !guia(l) && !l.vin && Math.abs(l.sz - u.sz) <= Math.max(0.8, u.sz * 0.12) && l.y - u.y <= u.sz * (caja ? 2.4 : 1.75) && l.y - u.y >= u.sz * 0.7 &&
+        !viñeta(l.segs[0].its[0].s) && (Math.abs(l.x0 - u.x0) < 3 || (llena && !centrada && Math.abs(l.x0 - u.x0) < u.sz * 0.9) || Math.abs((l.x0 + l.x1) / 2 - (u.x0 + u.x1) / 2) < Math.max(3, u.sz * 0.45) || (P.lineas.length === 1 && u.x0 - l.x0 > 3 && u.x0 - l.x0 < 60) || (P.lineas.length > 1 && Math.abs(l.x0 - P.lineas[1].x0) < 3)) &&
         estiloBase([l]).cls === estiloBase([u]).cls;
       if (sigue) P.lineas.push(l); else { cerrar(); P = {lineas: [l]}; }
     }
@@ -1938,7 +2025,7 @@ const PDFX = (() => {
     const page = '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>' + escX(titulo || '') + '</title><style>' +
       'body{margin:0;background:#e3e6ec;padding:24px 12px}.pag{position:relative;margin:0 auto 24px;background:#fff;box-shadow:0 1px 6px #0003;overflow:hidden}' +
       '.pag svg{display:block}text{white-space:pre}' +
-      '.pag.real{box-sizing:border-box;height:auto;overflow:visible;color:#000}.real p{margin:0;overflow-wrap:break-word}.real sup{line-height:0}' +
+      '.pag.real{box-sizing:border-box;height:auto;overflow:visible;color:#000}.real p{margin:0;overflow-wrap:break-word}.real sup{line-height:0}.real .vi{display:inline-block;text-indent:0}' +
       '.real .bl{position:relative}.real .pos{position:relative}.real .pos>div{position:absolute}.real .pos>div{white-space:nowrap}' +
       '.real hr{margin:0;border:0;height:0}.real .im,.real .dib{display:block;overflow:visible}.real .caja{box-sizing:border-box}' +
       '.real table.t{white-space:normal;border-collapse:collapse;table-layout:fixed;max-width:100%}.real td{padding:1px;vertical-align:top;overflow-wrap:break-word}.real td>div>.im{display:inline-block}' +

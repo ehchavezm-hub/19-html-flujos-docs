@@ -441,7 +441,8 @@ const PDFX = (() => {
     const its = items.slice().sort((a, b) => a.y - b.y || a.x - b.x);
     const lns = [];
     for (const t of its) {
-      let l = null; for (let k = lns.length - 1; k >= 0 && k >= lns.length - 4; k--) { const m = lns[k]; if (Math.abs(m.y - t.y) < Math.max(m.sz, t.sz) * 0.38) { l = m; break; } }
+      // el renglón con la altura más cercana (una viñeta de otra fuente suele estar algo más arriba o abajo)
+      let l = null, dmin = 1e9; for (let k = lns.length - 1; k >= 0 && k >= lns.length - 4; k--) { const m = lns[k]; const dy = Math.abs(m.y - t.y); if (dy < Math.max(m.sz, t.sz) * 0.38 && dy < dmin) { l = m; dmin = dy; } }
       if (!l) { l = {y: t.y, sz: t.sz, its: []}; lns.push(l); }
       l.its.push(t); if (t.sz > l.sz) { l.sz = t.sz; l.y = t.y; }
     }
@@ -449,20 +450,38 @@ const PDFX = (() => {
       l.its.sort((a, b) => a.x - b.x); l.segs = [];
       for (const t of l.its) { const s = l.segs[l.segs.length - 1];
         if (s && t.x - s.x1 < Math.max(l.sz * 1.6, 8)) { s.its.push(t); s.x1 = Math.max(s.x1, t.x + t.len); } else l.segs.push({x0: t.x, x1: t.x + t.len, its: [t]}); }
+      // viñeta o número de lista separado de su texto por una tabulación: un solo elemento de lista
+      const i0 = l.segs[0].its[0], i1 = l.segs[0].its[1];
+      // viñeta como texto aparte dentro del mismo tramo («•» y, a cierta distancia, el texto)
+      if (i1 && /^[•▪◦●■◆►✓\-–·o\uf0b7\uf0a7\uf076\uf0d8\uf0fc]$/.test(i0.s.trim()) && i1.x - (i0.x + i0.len) > i0.sz * 0.5) {
+        l.vin = {txt: i0.s.trim().replace(/^[\uf0b7\uf0a7\uf076\uf0d8\uf0fc]$/, '•'), x: i0.x, cls: i0.cls, col: i0.col};
+        l.segs[0] = {x0: i1.x, x1: l.segs[0].x1, its: l.segs[0].its.slice(1)};
+      }
+      const s0 = l.segs[0].its.map(t => t.s).join('').trim();
+      if (!l.vin && l.segs.length > 1 && /^([•▪◦●■◆►✓\-–·o\uf0b7\uf0a7\uf076\uf0d8\uf0fc]|\d{1,2}[.)]|[a-zA-Z][.)]|\d+(\.\d+)+\.?)$/.test(s0)) {
+        l.vin = {txt: s0.replace(/^[\uf0b7\uf0a7\uf076\uf0d8\uf0fc]$/, '•'), x: l.segs[0].x0, cls: l.segs[0].its[0].cls, col: l.segs[0].its[0].col};
+        l.segs = l.segs.slice(1); if (l.segs.length > 1) l.segs = [{x0: l.segs[0].x0, x1: l.segs[l.segs.length - 1].x1, its: l.segs.flatMap(s => s.its)}];
+      }
       l.x0 = l.segs[0].x0; l.x1 = Math.max(...l.segs.map(s => s.x1));
     }
     lns.sort((a, b) => a.y - b.y);
     const izq = caja ? caja[0] : Math.min(...lns.map(l => l.x0)), der = caja ? caja[2] : Math.max(...lns.map(l => l.x1)), centro = (izq + der) / 2;
+    // margen derecho real: el borde que comparten más renglones largos (el texto justificado termina ahí)
+    const largos = lns.filter(l => l.x1 - l.x0 > (der - izq) * 0.55); const cuenta = new Map();
+    for (const l of largos) { const k = Math.round(l.x1 / 3); cuenta.set(k, (cuenta.get(k) || 0) + 1); }
+    const moda = [...cuenta].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0];
+    let derLin = moda && moda[1] >= 2 ? moda[0] * 3 : Math.max(...lns.map(l => l.x1));
+    if (caja) derLin = Math.min(caja[2] - 2, derLin);
     const out = []; let P = null;
-    const viñeta = s => /^\s*([•●▪■◦○\-–—]|\d{1,2}[.)]|[a-z][.)])\s/.test(s);
+    const viñeta = s => /^\s*([•●▪■◦○\-–—]|\d{1,2}[.)]|[a-z][.)])(\s|$)/.test(s);
     const cerrar = () => {
       if (!P) return; const L = P.lineas;
       const xs0 = L.map(l => l.x0), xs1 = L.map(l => l.x1), cs = L.map(l => (l.x0 + l.x1) / 2);
       const rango = v => Math.max(...v) - Math.min(...v); let bz = null; const base0 = () => bz || (bz = estiloBase(L));
       let al = 'left';
       const tc = Math.max(3, base0().sz * 0.45);
-      if (L.length > 1) { if (rango(cs) < tc && rango(xs0) > tc) al = 'center'; else if (rango(xs1) < 3 && rango(xs0) > 3) al = 'right'; else if (L.length > 2 && rango(xs0.slice(1)) < 3 && rango(xs1.slice(0, -1)) < 3) al = 'justify'; }
-      else { const l = L[0]; if (Math.abs((l.x0 + l.x1) / 2 - centro) < (caja ? Math.max(3, l.sz * 0.35) : 4) && l.x0 > izq + (caja ? 3 : 15)) al = 'center'; else if (Math.abs(l.x1 - der) < (caja ? 3 : 4) && l.x0 > izq + (der - izq) * 0.3) al = 'right'; }
+      if (L.length > 1) { if (!L[0].vin && rango(cs) < tc && rango(xs0) > tc) al = 'center'; else if (rango(xs1) < 3 && rango(xs0) > 3) al = 'right'; else if (L.length > 2 && rango(xs0.slice(1)) < 3 && rango(xs1.slice(0, -1)) < 3) al = 'justify'; }
+      else { const l = L[0]; if (!l.vin && (caja || l.x1 - l.x0 < (der - izq) * 0.85) && Math.abs((l.x0 + l.x1) / 2 - centro) < (caja ? Math.max(3, l.sz * 0.35) : 4) && l.x0 > izq + (caja ? 3 : 15)) al = 'center'; else if (Math.abs(l.x1 - der) < (caja ? 3 : 4) && l.x0 > izq + (der - izq) * 0.3) al = 'right'; }
       const x0 = Math.min(...xs0), x1 = Math.max(...xs1);
       const base = base0();
       const paso = L.length > 1 ? (L[L.length - 1].y - L[0].y) / (L.length - 1) : base.sz * 1.2;
@@ -473,22 +492,33 @@ const PDFX = (() => {
       const st = ['font-size:' + px(base.sz), 'line-height:' + r2(lh)]; if (base.col !== '#000000') st.push('color:' + base.col);
       if (al !== 'left') st.push('text-align:' + al); if (sangria) st.push('text-indent:' + px(sangria)); if (L.length === 1 && !caja) st.push('white-space:nowrap');
       if (caja && al === 'left' && x0 - caja[0] > 8 && x0 - caja[0] < (caja[2] - caja[0]) * 0.35) st.push('padding-left:' + px(x0 - caja[0] - 3));
+      const vin = L[0].vin; let x0v = x0;
+      if (vin) { const sep = Math.max(4, L[0].x0 - vin.x); x0v = vin.x;
+        txt = '<span class="vi" style="width:' + px(sep) + (vin.cls !== base.cls ? '' : '') + '">' + escX(vin.txt) + '</span>' + txt;
+        const k = st.findIndex(z => z.startsWith('text-indent')); if (k >= 0) st.splice(k, 1);
+        st.push('padding-left:' + px(sep), 'text-indent:' + px(-sep)); if (al === 'justify' || al === 'left') {} }
       const top = L[0].y - base.sz * (0.5 + lh / 2) + base.sz * 0.15, bot = L[L.length - 1].y + base.sz * (lh / 2 - 0.35);
-      out.push({bb: [al === 'center' && !caja ? Math.min(x0, izq) : x0, top, al === 'center' && !caja ? Math.max(x1, der) : x1, bot], propio: [x0, top, x1, bot], tipo: 'p',
-        ancho: L.length > 1 && al !== 'center' ? x1 - x0 + base.sz * 1.5 : 0,
+      out.push({bb: [al === 'center' && !caja ? Math.min(x0v, izq) : x0v, top, al === 'center' && !caja ? Math.max(x1, der) : x1, bot], propio: [x0v, top, x1, bot], tipo: 'p',
+        ancho: L.length > 1 && al !== 'center' ? x1 - x0v + base.sz * 1.5 : 0,
         multi: L.length > 1, html: '<p class="' + base.cls + ' ' + clase(st.join(';')) + '">' + txt + '</p>'});
       P = null;
     };
     for (const l of lns) {
-      if (l.segs.length > 1 && !caja) {           // línea con columnas separadas (p. ej. «REFERENCIA ……  CUI N°…»): cada parte por su lado
+      if (l.segs.length > 1 && !caja && !l.vin) {           // línea con columnas separadas (p. ej. «REFERENCIA ……  CUI N°…»): cada parte por su lado
         cerrar();
         for (const s of l.segs) { const sub = {y: l.y, sz: l.sz, segs: [s], x0: s.x0, x1: s.x1, its: s.its}; P = {lineas: [sub]}; cerrar(); }
         continue;
       }
       if (l.segs.length > 1) { const s0 = l.segs; l.segs = [{x0: s0[0].x0, x1: s0[s0.length - 1].x1, its: s0.flatMap(s => s.its), hueco: true}]; }
       const u = P && P.lineas[P.lineas.length - 1];
-      const sigue = u && Math.abs(l.sz - u.sz) <= Math.max(0.8, u.sz * 0.12) && l.y - u.y <= u.sz * (caja ? 2.4 : 1.75) && l.y - u.y >= u.sz * 0.7 &&
-        !viñeta(l.segs[0].its[0].s) && (Math.abs(l.x0 - u.x0) < 3 || Math.abs((l.x0 + l.x1) / 2 - (u.x0 + u.x1) / 2) < Math.max(3, u.sz * 0.45) || (P.lineas.length === 1 && u.x0 - l.x0 > 3 && u.x0 - l.x0 < 60) || (P.lineas.length > 1 && Math.abs(l.x0 - P.lineas[1].x0) < 3)) &&
+      // un renglón que no llega al margen derecho cierra su párrafo (en Word, el que continúa llena el ancho);
+      // los renglones con puntos guía (índices) van siempre solos
+      const txtL = x => x.segs.map(sg => sg.its.map(t => t.s).join(' ')).join(' ');
+      const guia = x => /(\.\s?){5,}|…{2,}|_{5,}/.test(txtL(x));
+      const centrada = u && Math.abs((l.x0 + l.x1) / 2 - (u.x0 + u.x1) / 2) < Math.max(3, u.sz * 0.45) && Math.abs(l.x0 - u.x0) > 3;
+      const llena = u && (u.x1 >= derLin - Math.max(u.sz * 2.2, 10) || centrada);
+      const sigue = u && llena && !guia(u) && !guia(l) && !l.vin && Math.abs(l.sz - u.sz) <= Math.max(0.8, u.sz * 0.12) && l.y - u.y <= u.sz * (caja ? 2.4 : 1.75) && l.y - u.y >= u.sz * 0.7 &&
+        !viñeta(l.segs[0].its[0].s) && (Math.abs(l.x0 - u.x0) < 3 || (llena && !centrada && Math.abs(l.x0 - u.x0) < u.sz * 0.9) || Math.abs((l.x0 + l.x1) / 2 - (u.x0 + u.x1) / 2) < Math.max(3, u.sz * 0.45) || (P.lineas.length === 1 && u.x0 - l.x0 > 3 && u.x0 - l.x0 < 60) || (P.lineas.length > 1 && Math.abs(l.x0 - P.lineas[1].x0) < 3)) &&
         estiloBase([l]).cls === estiloBase([u]).cls;
       if (sigue) P.lineas.push(l); else { cerrar(); P = {lineas: [l]}; }
     }
@@ -534,7 +564,7 @@ const PDFX = (() => {
     const page = '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>' + escX(titulo || '') + '</title><style>' +
       'body{margin:0;background:#e3e6ec;padding:24px 12px}.pag{position:relative;margin:0 auto 24px;background:#fff;box-shadow:0 1px 6px #0003;overflow:hidden}' +
       '.pag svg{display:block}text{white-space:pre}' +
-      '.pag.real{box-sizing:border-box;height:auto;overflow:visible;color:#000}.real p{margin:0;overflow-wrap:break-word}.real sup{line-height:0}' +
+      '.pag.real{box-sizing:border-box;height:auto;overflow:visible;color:#000}.real p{margin:0;overflow-wrap:break-word}.real sup{line-height:0}.real .vi{display:inline-block;text-indent:0}' +
       '.real .bl{position:relative}.real .pos{position:relative}.real .pos>div{position:absolute}.real .pos>div{white-space:nowrap}' +
       '.real hr{margin:0;border:0;height:0}.real .im,.real .dib{display:block;overflow:visible}.real .caja{box-sizing:border-box}' +
       '.real table.t{white-space:normal;border-collapse:collapse;table-layout:fixed;max-width:100%}.real td{padding:1px;vertical-align:top;overflow-wrap:break-word}.real td>div>.im{display:inline-block}' +
