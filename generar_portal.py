@@ -400,32 +400,33 @@ nav a .sub{flex:none;font-size:10px;font-weight:700;color:#e7b45a}
 .empty{padding:14px 10px;color:var(--side-mut);font-size:13px}
 /* ---- área de trabajo */
 main{display:flex;flex-direction:column;min-width:0;min-height:0}
-header.vh{background:var(--papel);border-bottom:1px solid var(--linea);padding:16px 24px;display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
-/* rótulo: la cartela del plano */
-.rotulo{flex:1;min-width:300px;display:grid;grid-template-columns:repeat(4,minmax(0,auto)) 1fr;border:1.5px solid var(--azul);border-radius:3px;background:var(--papel);overflow:hidden}
-.rotulo>div{padding:6px 12px 7px;border-left:1px solid var(--linea);min-width:0}
-.rotulo small{display:block;font-size:11px;color:var(--mut);line-height:1.3}
-.rotulo b{display:block;font-size:13px;font-weight:650;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
-.rotulo .r-tit{grid-column:1/-1;border-left:0;background:var(--azul);color:#fff;padding:8px 14px 10px;border-bottom:3px solid var(--acc)}.rotulo .r-tit small{color:var(--side-mut)}
-.rotulo h1{margin:0;font-size:21px;line-height:1.22;letter-spacing:-.015em;font-weight:750;text-wrap:balance}
-.rotulo>div:nth-child(2){border-left:0}
-.rotulo .r-arch b{font-weight:500;color:var(--tinta2)}
+header.vh{background:var(--papel);border-bottom:1px solid var(--linea);padding:8px 16px;display:flex;gap:12px;align-items:center}
+/* rótulo compacto: el título en la franja azul y los datos del plano en la misma línea */
+.rotulo{flex:1;min-width:0;display:flex;align-items:stretch;border:1.5px solid var(--azul);border-radius:3px;background:var(--papel);overflow:hidden;height:46px}
+.rotulo>div{padding:5px 12px;border-left:1px solid var(--linea2);min-width:0;display:flex;flex-direction:column;justify-content:center;flex:none}
+.rotulo small{display:block;font-size:10.5px;color:var(--mut);line-height:1.2}
+.rotulo b{display:block;font-size:12.5px;font-weight:650;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.rotulo .r-tit{border-left:0;background:var(--azul);color:#fff;padding:0 16px 0 14px;border-right:3px solid var(--acc);flex:0 1 auto;min-width:140px;max-width:44%}
+.rotulo h1{margin:0;font-size:16.5px;line-height:1.2;letter-spacing:-.01em;font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rotulo .r-tit+div{border-left:0}
+.rotulo .r-arch{flex:1 1 120px;min-width:90px}.rotulo .r-arch b{font-weight:500;color:var(--tinta2)}
 .rotulo .r-est b{color:var(--ok)}.rotulo .r-est.p b{color:var(--pend)}
 .tipo{display:inline-flex;align-items:center;gap:6px;font-weight:650;color:var(--c)}.tipo::before{content:"";width:7px;height:7px;border-radius:1px;background:var(--c)}
-.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding-top:2px}
+.actions{display:flex;gap:6px;align-items:center;flex:none}
+.bar .nota{margin-left:auto;font-size:11.5px;color:var(--acc-txt);max-width:52%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 button,.btn{font:inherit;font-size:13px;font-weight:600;min-height:34px;padding:7px 13px;border-radius:var(--r);border:1px solid var(--linea);background:var(--papel);color:var(--tinta);cursor:pointer;text-decoration:none;touch-action:manipulation;
 transition:border-color .12s,background-color .12s,transform .08s}
 button:hover,.btn:hover{border-color:var(--azul2);background:var(--azul-suave)}button:active{transform:translateY(1px)}
 #bDesc,#bDesc2{background:var(--acc);border-color:var(--acc);color:#fff}#bDesc:hover,#bDesc2:hover{background:var(--acc-txt);border-color:var(--acc-txt)}
 button[aria-pressed=true]{background:var(--acc);color:#fff;border-color:var(--acc)}
-.bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:8px 24px;background:var(--azul-suave);border-bottom:1px solid var(--linea2);font-size:12.5px;color:var(--mut)}
+.bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:6px 16px;background:var(--azul-suave);border-bottom:1px solid var(--linea2);font-size:12.5px;color:var(--mut)}
 .bar .grp{display:flex;gap:4px;align-items:center;padding-right:12px;border-right:1px solid var(--linea2)}.bar .grp:last-of-type{border-right:0}
 .bar button{min-height:30px;padding:4px 10px;font-size:12.5px;font-weight:500}#zl{min-width:46px;text-align:center;font-variant-numeric:tabular-nums}
 .tabs button[aria-selected=true]{background:var(--azul);color:#fff;border-color:var(--azul)}
 .note{margin:12px 24px 0;padding:9px 12px;background:var(--acc-suave);border-left:3px solid var(--acc);border-radius:2px;font-size:12.5px;color:#6b2c06}
-.canvas{flex:1;overflow:auto;margin:14px 24px 22px;background:var(--papel);border:1px solid var(--linea);border-radius:2px;cursor:grab;position:relative;min-height:0;overscroll-behavior:contain}
+.canvas{flex:1;overflow:auto;margin:10px 16px 14px;background:var(--papel);border:1px solid var(--linea);border-radius:2px;cursor:grab;position:relative;min-height:0;overscroll-behavior:contain}
 .canvas.drag{cursor:grabbing}.stage{transform-origin:0 0;width:max-content}.stage svg{display:block}
-.frame{flex:1;margin:14px 24px 22px;border:1px solid var(--linea);border-radius:2px;overflow:auto;background:#e3e6e8;min-height:0}
+.frame{flex:1;margin:10px 16px 14px;border:1px solid var(--linea);border-radius:2px;overflow:auto;background:#e3e6e8;min-height:0}
 .frame iframe{border:0;width:100%;height:100%;display:block;background:#fff}.frame .zoomwrap{transform-origin:0 0;height:100%}
 /* ---- inicio: registro de documentos */
 .home{padding:30px 36px 48px;overflow:auto;max-width:1180px}
@@ -454,7 +455,7 @@ mark{background:#ffd79a;padding:0 1px}
 input[type=range]{accent-color:var(--acc);min-width:160px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 @media (max-width:860px){body{grid-template-columns:1fr;overflow:auto}aside{max-height:50vh;border-right:0;border-bottom:1px solid var(--linea)}.home{padding:22px 16px}
-.rotulo{grid-template-columns:1fr 1fr}.rotulo>div{border-left:0;border-top:1px solid var(--linea2)}.rotulo .r-tit{border-top:0}
+.rotulo{flex-wrap:wrap;height:auto}.rotulo .r-tit{max-width:none;flex:1 1 100%;border-right:0;border-bottom:3px solid var(--acc);padding:8px 12px}header.vh{flex-wrap:wrap}
 .reg td.t,.reg th.t,.reg td.f,.reg th.f{display:none}}
 @media print{aside,.bar,.actions{display:none}body{display:block;overflow:visible}.canvas{overflow:visible;border:0}}
 </style></head>
@@ -512,12 +513,12 @@ function marcar(){nav.querySelectorAll('a').forEach(a=>a.classList.toggle('on',a
 $('#q').addEventListener('input',ev=>menu(ev.target.value));
 function rotulo(m){
   const pend=m.tipo==='pendiente', estado=m.estado||(pend?'Pendiente':m.tipo==='error'?'No se pudo convertir':'Disponible');
-  const c=[['Sección',e(m.seccion)],['Tipo',m.tipo in OK?'<span class="tipo" style="--c:'+COL[m.tipo]+'">'+NOM[m.tipo]+'</span>':'—'],['Revisión',e(m.revision||'—')],['Fecha',e(m.fecha||'—')]];
-  if(m.responsable)c.push(['Responsable',e(m.responsable)]);
-  let h='<div class="rotulo"><div class="r-tit"><small>Documento</small><h1>'+e(m.titulo)+'</h1></div>';
+  const c=[['Sección',e(m.seccion)],['Tipo',m.tipo in OK?'<span class="tipo" style="--c:'+COL[m.tipo]+'">'+NOM[m.tipo]+'</span>':'—']];
+  if(m.revision)c.push(['Rev.',e(m.revision)]); if(m.fecha)c.push(['Fecha',e(m.fecha)]); if(m.responsable)c.push(['Responsable',e(m.responsable)]);
+  let h='<div class="rotulo"><div class="r-tit"><h1 title="'+e(m.titulo)+'">'+e(m.titulo)+'</h1></div>';
   for(const [k,v] of c)h+='<div><small>'+k+'</small><b>'+v+'</b></div>';
   h+='<div class="r-est'+(pend?' p':'')+'"><small>Estado</small><b>'+e(estado)+'</b></div>';
-  if(m.nombre||m.archivo)h+='<div class="r-arch" style="grid-column:1/-1;border-left:0;border-top:1px solid var(--linea)"><small>Archivo</small><b title="'+e(m.archivo)+'">'+e(m.nombre||m.archivo)+'</b></div>';
+  if(m.nombre||m.archivo)h+='<div class="r-arch"><small>Archivo</small><b title="'+e(m.archivo)+'">'+e(m.nombre||m.archivo)+'</b></div>';
   return h+'</div>';
 }
 function inicio(){
@@ -544,7 +545,6 @@ function ver(id){
   if(m.tipo==='drawio'&&m.paginas.some(p=>p.pasos>1)) h+='<button type="button" id="bPasos" aria-pressed="false">Paso a paso</button>';
   if(m.tipo in OK) h+='<button type="button" id="bDesc">Descargar original</button><button type="button" id="bFull">Pantalla completa</button>';
   h+='</div></header>';
-  if(m.nota) h+='<p class="note">'+e(m.nota)+'</p>';
   if(m.tipo==='pendiente'||m.tipo==='error'){
     main.innerHTML=h+'<div class="pendbox"><h2>'+(m.tipo==='error'?'No se pudo convertir':'Documento pendiente')+'</h2><p>'+(m.tipo==='error'?'Revisa el archivo «'+e(m.archivo)+'» (los avisos aparecen al generar el portal).':'Aún no hay archivo para este documento. Cuando exista, colócalo en la carpeta y vuelve a generar el portal.')+'</p></div>';return;
   }
@@ -565,9 +565,11 @@ function ver(id){
     main.innerHTML=h;
   } else {
     h+='<div class="bar"><span class="grp"><button data-z="out" aria-label="Alejar">−</button><span id="zl">100%</span><button data-z="in" aria-label="Acercar">+</button><button data-z="1" title="Volver al 100 %">Tamaño real</button></span></div>'
-      +'<div class="frame" id="fr"><div class="zoomwrap" id="zw"><iframe title="'+e(m.titulo)+'" sandbox="allow-scripts allow-popups allow-modals allow-forms allow-downloads" src="'+blobUrl(vista(m),'text/html')+'"></iframe></div></div>';
+      +'<div class="frame" id="fr"><div class="zoomwrap" id="zw"><iframe title="'+e(m.titulo)+'" sandbox="allow-scripts allow-popups allow-modals allow-forms allow-downloads" src="'+htmlUrl(vista(m))+'"></iframe></div></div>';
     main.innerHTML=h; zoomHtml();
   }
+  // la nota (p. ej. «vista convertida…») va en la barra de herramientas, no ocupa una fila propia
+  if(m.nota){const bar=main.querySelector('.bar'); if(bar) bar.insertAdjacentHTML('beforeend','<span class="nota" title="'+e(m.nota)+'">'+e(m.nota)+'</span>'); else main.querySelector('header').insertAdjacentHTML('afterend','<p class="note">'+e(m.nota)+'</p>')}
   const bd=$('#bDesc'); if(bd) bd.onclick=()=>descargar(m);
   const bf=$('#bFull'); if(bf) bf.onclick=()=>{const el=$('.canvas')||$('.frame'); if(el&&el.requestFullscreen) el.requestFullscreen()};
 }
@@ -595,15 +597,24 @@ function aplicar(){const st=$('#st'); if(!st||!Z)return; st.style.transform='sca
 function ajustarAncho(){const cv=$('#cv'); Z.s=Math.min(1.5,Math.max(0.2,(cv.clientWidth-24)/PG.w)); aplicar()}
 function ajustar(){const cv=$('#cv'); Z.s=Math.min(1.5,Math.max(0.1,Math.min((cv.clientWidth-24)/PG.w,(cv.clientHeight-24)/PG.h))); aplicar()}
 function zoomCtl(){main.querySelectorAll('[data-z]').forEach(b=>b.onclick=()=>{const a=b.dataset.z; if(a==='fit')ajustar(); else if(a==='ancho')ajustarAncho(); else {Z.s=a==='1'?1:Math.min(4,Math.max(0.1,Z.s*(a==='in'?1.25:0.8)));aplicar()}});
-  $('#cv').addEventListener('wheel',ev=>{if(!ev.ctrlKey)return;ev.preventDefault();Z.s=Math.min(4,Math.max(0.1,Z.s*(ev.deltaY<0?1.1:0.9)));aplicar()},{passive:false});
+  ZOOM=d=>{Z.s=d===0?1:Math.min(4,Math.max(0.1,Z.s*(d>0?1.1:0.9)));aplicar()};
   $('#cv').addEventListener('keydown',ev=>{const cv=$('#cv');if(ev.key==='+'){Z.s*=1.2;aplicar()}if(ev.key==='-'){Z.s/=1.2;aplicar()}if(ev.key==='ArrowRight'&&!$('#steps').hidden){pasos(step+1);ev.preventDefault()}if(ev.key==='ArrowLeft'&&!$('#steps').hidden){pasos(step-1);ev.preventDefault()}});
 }
 function arrastre(el){let d=null;el.addEventListener('pointerdown',ev=>{if(ev.button)return;d={x:ev.clientX,y:ev.clientY,l:el.scrollLeft,t:el.scrollTop};el.classList.add('drag');el.setPointerCapture(ev.pointerId)});
   el.addEventListener('pointermove',ev=>{if(!d)return;el.scrollLeft=d.l-(ev.clientX-d.x);el.scrollTop=d.t-(ev.clientY-d.y)});
   ['pointerup','pointercancel'].forEach(t=>el.addEventListener(t,()=>{d=null;el.classList.remove('drag')}))}
 function zoomHtml(){let s=1;const zw=$('#zw');const ap=()=>{zw.style.transform='scale('+s+')';zw.style.width=(100/s)+'%';zw.style.height=(100/s)+'%';$('#zl').textContent=Math.round(s*100)+'%'};
+  ZOOM=d=>{s=d===0?1:Math.min(3,Math.max(0.3,s*(d>0?1.1:1/1.1)));ap()};
   main.querySelectorAll('[data-z]').forEach(b=>b.onclick=()=>{const a=b.dataset.z;s=a==='1'?1:Math.min(3,Math.max(0.3,s*(a==='in'?1.2:1/1.2)));ap()})}
-function ruta(){marcar(); stop(); const id=ACTUAL; if(id&&byId[id]) ver(id); else inicio(); main.scrollTop=0}
+// Ctrl + rueda (o Ctrl +/−/0) agranda solo el documento, nunca la ventana con el menú
+let ZOOM=null;
+window.addEventListener('wheel',ev=>{if(!ev.ctrlKey)return;ev.preventDefault();if(ZOOM)ZOOM(ev.deltaY<0?1:-1)},{passive:false});
+window.addEventListener('keydown',ev=>{if(!(ev.ctrlKey||ev.metaKey))return;const d={'+':1,'=':1,'-':-1,'_':-1,'0':0}[ev.key];if(d===undefined)return;ev.preventDefault();if(ZOOM)ZOOM(d)});
+window.addEventListener('message',ev=>{if(ev.data&&typeof ev.data.pz==='number'&&ZOOM)ZOOM(ev.data.pz)});
+// las vistas HTML van en un iframe: un pequeño script les pasa el Ctrl + rueda al portal
+const PUENTE='<script>addEventListener("wheel",function(e){if(e.ctrlKey){e.preventDefault();parent.postMessage({pz:e.deltaY<0?1:-1},"*")}},{passive:false});addEventListener("keydown",function(e){if(!(e.ctrlKey||e.metaKey))return;var d={"+":1,"=":1,"-":-1,"_":-1,"0":0}[e.key];if(d===undefined)return;e.preventDefault();parent.postMessage({pz:d},"*")});<\/script>';
+function htmlUrl(id){const k='h-'+id;if(blobs[k])return blobs[k];const t=new TextDecoder().decode(bytes(id));return blobs[k]=URL.createObjectURL(new Blob([t+PUENTE],{type:'text/html'}))}
+function ruta(){ZOOM=null; marcar(); stop(); const id=ACTUAL; if(id&&byId[id]) ver(id); else inicio(); main.scrollTop=0}
 // navegación interna: funciona igual abierto desde la carpeta (file://) o desde el generador (blob:, que no admite #)
 function ir(id){ACTUAL=id; if(location.protocol!=='blob:'){try{history.pushState(null,'','#'+id)}catch(e){}} ruta()}
 document.addEventListener('click',ev=>{const a=ev.target.closest('a[href^="#"]'); if(!a)return; ev.preventDefault(); ir(a.getAttribute('href').slice(1))});
