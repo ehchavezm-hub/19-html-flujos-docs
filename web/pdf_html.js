@@ -85,7 +85,7 @@ const PDFX = (() => {
           (st.dash && st.dash.length ? ' stroke-dasharray="' + st.dash.map(v => r2(v * escala())).join(' ') + '"' : ''); }
       const info = {fill: fill ? st.fill : null, stroke: stroke ? st.stroke : null, lw: stroke ? Math.max(st.lw * escala(), 0.5) : 0, fa: st.fa};
       const prev = els[els.length - 1];                    // unir trazos seguidos con el mismo estilo (bordes de tablas)
-      if (prev && prev.t === 'p' && prev.a === a) { prev.d += ' ' + d; prev.g.push({g, ...info}); } else els.push({t: 'p', a, d, g: [{g, ...info}]});
+      if (prev && prev.t === 'p' && prev.a === a) { prev.d += ' ' + d; prev.g.push({g, d, ...info}); } else els.push({t: 'p', a, d, g: [{g, d, ...info}]});
     }
     function texto(glyphs) {
       const f = st.font; if (!f || !st.size) return;
@@ -233,8 +233,53 @@ const PDFX = (() => {
   }                                   // estilos repetidos → clases (pesa menos)
   const clase = css => { if (!ESTILOS.has(css)) ESTILOS.set(css, 'e' + ESTILOS.size.toString(36)); return ESTILOS.get(css); };
 
+  // ---------- gráficos (barras): muchas cajas de color del mismo ancho apoyadas en la misma base, o del mismo alto
+  // alineadas a la izquierda. Esa zona (barras, rejilla, ejes, etiquetas y leyenda) se conserva como dibujo SVG.
+  function graficos(els) {
+    const cajas = [];
+    for (const e of els) if (e.t === 'p') for (const q of e.g) if (q.fill && !esBlanco(q.fill) && !q.g.curva)
+      for (const r of (q.g.rects.length ? q.g.rects : (q.g.segs.length >= 3 && q.g.segs.length <= 5 ? [q.g.bb] : []))) { const w = r[2] - r[0], h = r[3] - r[1]; if (w > 2.2 && h > 2.2) cajas.push({r, w, h, c: q.fill}); }   // las líneas (rectángulos finos) no son barras
+    const zonas = [];
+    const agrupar = (clave) => { const m = new Map(); for (const c of cajas) { const k = clave(c); if (k == null) continue; if (!m.has(k)) m.set(k, []); m.get(k).push(c); } return [...m.values()]; };
+    const cen = els.filter(e => e.t === 't' && !e.ang).map(e => [e.x + e.len / 2, e.y - e.sz * 0.3]);
+    const conTexto = c => cen.some(([x, y]) => x > c.r[0] && x < c.r[2] && y > c.r[1] && y < c.r[3]);
+    // barras: separadas entre sí (las celdas de una tabla se tocan) y sin texto dentro
+    const separadas = (g, vert) => { const o = g.slice().sort((a, b) => vert ? a.r[0] - b.r[0] : a.r[1] - b.r[1]); let n = 0;
+      for (let i = 1; i < o.length; i++) { const gap = vert ? o[i].r[0] - o[i - 1].r[2] : o[i].r[1] - o[i - 1].r[3]; if (gap > 0.6) n++; } return n >= (o.length - 1) * 0.6; };
+    const grupos = [...agrupar(c => c.c + '|' + Math.round(c.w * 2) + '|' + Math.round(c.r[3] / 2)).map(g => [g, true]), ...agrupar(c => c.c + '|' + Math.round(c.h * 2) + '|' + Math.round(c.r[0] / 2)).map(g => [g, false])];
+    for (const [g, vert] of grupos) {
+      if (g.length < 6 || !separadas(g, vert) || g.filter(conTexto).length > g.length * 0.2) continue;
+      const bb = [Math.min(...g.map(c => c.r[0])), Math.min(...g.map(c => c.r[1])), Math.max(...g.map(c => c.r[2])), Math.max(...g.map(c => c.r[3]))];
+      if (bb[2] - bb[0] < 60 && bb[3] - bb[1] < 60) continue;
+      // barras de distinto tamaño (no una fila de celdas iguales de una tabla)
+      const lados = g.map(c => vert ? c.h : c.w); const tam = new Set(lados.map(Math.round)); if (tam.size < 3 || Math.max(...lados) < Math.min(...lados) * 1.8) continue;
+      const z = zonas.find(z => solapaX(z, bb, -30) && solapaY(z, bb, -30));
+      if (z) { z[0] = Math.min(z[0], bb[0]); z[1] = Math.min(z[1], bb[1]); z[2] = Math.max(z[2], bb[2]); z[3] = Math.max(z[3], bb[3]); } else zonas.push(bb);
+    }
+    // cada zona se amplía a los ejes, etiquetas y el marco del gráfico
+    return zonas.map(z => [z[0] - 60, z[1] - 40, z[2] + 40, z[3] + 70]);
+  }
   function estructurar(els, W, H) {
     const textos = [], imgs = [], lineas = [], cajas = [], dibujos = [];
+    const zonasG = graficos(els);
+    if (zonasG.length) {
+      const enZona = bb => zonasG.findIndex(z => bb[0] >= z[0] && bb[1] >= z[1] && bb[2] <= z[2] && bb[3] <= z[3]);
+      const partes = zonasG.map(() => ({svg: '', bb: [1e9, 1e9, -1e9, -1e9]}));
+      const suma = (k, bb, svg) => { const P = partes[k]; P.svg += svg; P.bb = [Math.min(P.bb[0], bb[0]), Math.min(P.bb[1], bb[1]), Math.max(P.bb[2], bb[2]), Math.max(P.bb[3], bb[3])]; };
+      const resto = [];
+      for (const e of els) {
+        if (e.t === 'p') { const g2 = [];
+          for (const q of e.g) { const k = enZona(q.g.bb); if (k >= 0) suma(k, q.g.bb, '<path d="' + q.d + '" ' + e.a + '/>'); else g2.push(q); }
+          if (g2.length) resto.push(g2.length === e.g.length ? e : Object.assign({}, e, {g: g2})); }
+        else if (e.t === 't') { const bb = [e.x - 1, e.y - e.sz, e.x + e.len + 1, e.y + e.sz * 0.3]; const k = e.ang ? -1 : enZona(bb);
+          const k2 = e.ang ? zonasG.findIndex(z => dentro(e.x, e.y, z)) : k;
+          if (k2 >= 0) suma(k2, bb, textoSvg(e)); else resto.push(e); }
+        else if (e.t === 'i') { const k = enZona(e.bb); if (k >= 0) suma(k, e.bb, e.h); else resto.push(e); }
+        else resto.push(e);
+      }
+      for (const P of partes) if (P.svg) dibujos.push({bb: P.bb, svg: '<g data-graf="1">' + P.svg + '</g>', grafico: true});
+      els = resto;
+    }
     for (const e of els) {
       if (e.t === 't') { if (e.ang) { const a = e.ang * Math.PI / 180, co = Math.cos(a), si = Math.sin(a);
           const pts = [[0, -e.sz * 0.85], [e.len, -e.sz * 0.85], [0, e.sz * 0.25], [e.len, e.sz * 0.25]].map(([u, v]) => [e.x + u * co - v * si, e.y + u * si + v * co]);
