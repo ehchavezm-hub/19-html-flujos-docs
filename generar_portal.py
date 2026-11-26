@@ -372,11 +372,11 @@ PLANTILLA = r'''<!doctype html>
 --acc:#FF6600;--acc-btn:#CC4400;--acc-txt:#CC4400;--acc-suave:#FFF0E6;--ok:#1E6B3A;--ok-suave:#E3F1E8;--pend:#A33A00;--pend-suave:#FFE7D6;--r:4px;
 --drawio:#0078C1;--pdf:#CC4400;--html:#005A9C;--word:#003087;--excel:#1E6B3A;--ppt:#E85500;--pendiente:#FF8833;--error:#8F1D1D}
 *{box-sizing:border-box}[hidden]{display:none!important}html,body{height:100%;margin:0}
-body{font-family:__FONT__;color:var(--tinta);background:var(--fondo);display:grid;grid-template-columns:292px 1fr;overflow:hidden;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+body{font-family:__FONT__;color:var(--tinta);background:var(--fondo);display:grid;grid-template-columns:var(--menu-w,292px) 1fr;overflow:hidden;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
 :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 .salto{position:absolute;left:8px;top:-60px;z-index:20;background:var(--side);color:#fff;padding:8px 12px;border-radius:var(--r);text-decoration:none;font-size:13px}.salto:focus{top:8px}
 /* ---- menú lateral (Engineering Black, compacto) */
-aside{background:var(--side);color:var(--side-ink);display:flex;flex-direction:column;min-height:0;border-top:4px solid var(--acc)}
+aside{position:relative;background:var(--side);color:var(--side-ink);display:flex;flex-direction:column;min-height:0;border-top:4px solid var(--acc)}
 .brand{padding:14px 16px 10px}
 .brand .proy{display:block;font-size:10.17px;font-weight:500;color:#FF8833;margin-bottom:3px;letter-spacing:.01em}
 .brand b{display:block;font-size:15.67px;font-weight:600;letter-spacing:-.015em;line-height:1.2;color:#fff;text-wrap:balance}
@@ -400,6 +400,19 @@ nav a.pend{color:var(--side-mut)}nav a.pend .dot{background:transparent;box-shad
 nav a .sub{flex:none;font-size:8.67px;font-weight:500;color:#FF8833}
 .foot{display:flex;gap:14px;font-size:10.17px;color:var(--side-mut);padding:9px 16px}.foot b{color:#fff;font-weight:500;font-variant-numeric:tabular-nums}
 .empty{padding:14px 10px;color:var(--side-mut);font-size:11.67px}
+/* ---- botón de menú (tres líneas): oculta o muestra el menú lateral */
+.hamb{position:fixed;z-index:30;top:10px;left:calc(var(--menu-w,292px) - 40px);width:30px;height:30px;min-height:0;padding:0;display:grid;place-items:center;border:0;border-radius:4px;background:transparent;color:var(--side-ink);cursor:pointer;transition:background-color .12s}
+.hamb:hover{background:#ffffff1f;border:0}.hamb svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+body.sin-menu{grid-template-columns:0 1fr!important}body.sin-menu aside{visibility:hidden;overflow:hidden}
+body.sin-menu .hamb{left:8px;top:8px;background:var(--side);color:#fff}body.sin-menu .hamb:hover{background:#000}
+body.sin-menu header.vh{padding-left:48px}body.sin-menu .home{padding-left:60px}
+.brand{padding-right:44px!important}
+/* ---- tirador para cambiar el ancho del menú con el mouse */
+.tirador{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:25;touch-action:none}
+.tirador::after{content:"";position:absolute;top:0;bottom:0;left:3px;width:2px;background:transparent;transition:background-color .12s}
+.tirador:hover::after,body.arrastrando .tirador::after{background:var(--acc)}
+body.arrastrando{cursor:col-resize;user-select:none}body.arrastrando iframe{pointer-events:none}
+body.sin-menu .tirador{display:none}
 /* ---- área de trabajo */
 main{display:flex;flex-direction:column;min-width:0;min-height:0}
 header.vh{background:var(--papel);border-bottom:1px solid var(--linea);padding:5px 12px;display:flex;gap:12px;align-items:center}
@@ -456,18 +469,20 @@ mark{background:#ffd79a;padding:0 1px}
 [data-motion-item].cur .nb{stroke:var(--acc)!important;stroke-width:2.6!important}
 input[type=range]{accent-color:var(--acc);min-width:160px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
-@media (max-width:860px){body{grid-template-columns:1fr;overflow:auto}aside{max-height:50vh;border-right:0;border-bottom:1px solid var(--linea)}.home{padding:22px 16px}
+@media (max-width:860px){body{grid-template-columns:1fr!important;overflow:auto}.tirador{display:none}.hamb{position:absolute;left:auto;right:10px}body.sin-menu{grid-template-columns:1fr}body.sin-menu aside{display:none}body.sin-menu .hamb{right:auto;left:8px;position:fixed}aside{max-height:50vh;border-right:0;border-bottom:1px solid var(--linea)}.home{padding:22px 16px}
 .rotulo{flex-wrap:wrap;height:auto}.rotulo .r-tit{max-width:none;flex:1 1 100%;border-right:0;border-bottom:3px solid var(--acc);padding:8px 12px}header.vh{flex-wrap:wrap}
 .reg td.t,.reg th.t,.reg td.f,.reg th.f{display:none}}
 @media print{aside,.bar,.actions{display:none}body{display:block;overflow:visible}.canvas{overflow:visible;border:0}}
 </style></head>
 <body>
 <a class="salto" href="#main">Ir al documento</a>
-<aside>
+<button type="button" id="bMenu" class="hamb" aria-controls="menuLat" aria-expanded="true" aria-label="Ocultar menú" title="Ocultar menú"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+<aside id="menuLat">
   <div class="brand">__PROYECTO__<b>__TITULO__</b>__SUBTITULO__<span>Generado el __GENERADO__ · funciona sin internet</span></div>
   <div class="search"__BUSCADOR__><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" type="search" placeholder="Buscar documentos…" aria-label="Buscar documentos" autocomplete="off" spellcheck="false"></div>
   <nav id="nav" aria-label="Documentos"></nav>
   <div class="foot" id="foot"></div>
+  <div class="tirador" id="tirador" role="separator" aria-orientation="vertical" aria-label="Cambiar el ancho del menú" title="Arrastra para cambiar el ancho · doble clic para el ancho normal" tabindex="0"></div>
 </aside>
 <main id="main" tabindex="-1"></main>
 <script type="application/json" id="meta">__META__</script>
@@ -513,6 +528,22 @@ function menu(q){
 let ACTUAL=location.hash.slice(1);
 function marcar(){nav.querySelectorAll('a').forEach(a=>a.classList.toggle('on',a.dataset.id===ACTUAL))}
 $('#q').addEventListener('input',ev=>menu(ev.target.value));
+// botón de tres líneas: ocultar / mostrar el menú lateral (se recuerda en este navegador)
+function menuVisible(v){document.body.classList.toggle('sin-menu',!v);const b=$('#bMenu');b.setAttribute('aria-expanded',v);const t=v?'Ocultar menú':'Mostrar menú';b.setAttribute('aria-label',t);b.title=t;
+  try{localStorage.setItem('portal-menu',v?'1':'0')}catch(er){} if(Z&&typeof ajustarAncho==='function'&&$('#cv'))requestAnimationFrame(()=>{})}
+$('#bMenu').addEventListener('click',()=>menuVisible(document.body.classList.contains('sin-menu')));
+try{if(localStorage.getItem('portal-menu')==='0')menuVisible(false)}catch(er){}
+// ancho del menú: arrastrar el borde derecho (180–560 px), doble clic vuelve a 292 px, flechas con el teclado
+function anchoMenu(w,guardar){w=Math.round(Math.min(560,Math.max(180,w)));document.body.style.setProperty('--menu-w',w+'px');$('#tirador').setAttribute('aria-valuenow',w);
+  if(guardar)try{localStorage.setItem('portal-menu-w',String(w))}catch(er){}}
+try{const w=+localStorage.getItem('portal-menu-w');if(w)anchoMenu(w)}catch(er){}
+(function(){const t=$('#tirador');let x0=0,w0=0;
+  t.addEventListener('pointerdown',ev=>{ev.preventDefault();x0=ev.clientX;w0=$('#menuLat').getBoundingClientRect().width;t.setPointerCapture(ev.pointerId);document.body.classList.add('arrastrando')});
+  t.addEventListener('pointermove',ev=>{if(!document.body.classList.contains('arrastrando'))return;anchoMenu(w0+ev.clientX-x0)});
+  const fin=ev=>{if(!document.body.classList.contains('arrastrando'))return;document.body.classList.remove('arrastrando');anchoMenu($('#menuLat').getBoundingClientRect().width,true)};
+  t.addEventListener('pointerup',fin);t.addEventListener('pointercancel',fin);
+  t.addEventListener('dblclick',()=>anchoMenu(292,true));
+  t.addEventListener('keydown',ev=>{const w=$('#menuLat').getBoundingClientRect().width;if(ev.key==='ArrowLeft'){anchoMenu(w-16,true);ev.preventDefault()}if(ev.key==='ArrowRight'){anchoMenu(w+16,true);ev.preventDefault()}});})();
 function rotulo(m){
   const pend=m.tipo==='pendiente', estado=m.estado||(pend?'Pendiente':m.tipo==='error'?'No se pudo convertir':'Disponible');
   const c=[['Sección',e(m.seccion)],['Tipo',m.tipo in OK?'<span class="tipo" style="--c:'+COL[m.tipo]+'">'+NOM[m.tipo]+'</span>':'—']];
