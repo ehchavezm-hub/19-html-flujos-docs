@@ -27,6 +27,7 @@ Si la carpeta está en Google Drive, usa la carpeta sincronizada en la PC (Googl
 | Word `.docx` | Textos, títulos, listas, tablas e imágenes (las EMF/WMF que llevan dentro una imagen común se muestran; las solo vectoriales quedan como recuadro) |
 | Excel `.xlsx` / `.xlsm` | Tablas por hoja: valores, colores, celdas combinadas (sin formato condicional ni gráficos) |
 | PowerPoint `.pptx` | Diapositivas con textos, imágenes y tablas en su posición |
+| Libros `.epub` | El libro completo en HTML: capítulos en orden, índice con enlaces, estilos e imágenes (reducidas); buscable |
 | `.doc` / `.xls` / `.ppt` antiguos | Solo para descargar (guárdalos como `.docx` / `.xlsx` / `.pptx` para verlos) |
 
 Todos los documentos tienen **Descargar original** y **Pantalla completa**. Para que el portal sea liviano, los PDF, Word, Excel y PowerPoint no se copian dentro: «Descargar original» abre el archivo de la carpeta (el portal debe quedar junto a los documentos). Si vas a enviar el portal solo, marca «Incluir una copia de los originales». Las fotos grandes se reducen a 1600 px; el **buscador** encuentra títulos,

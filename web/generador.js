@@ -6,13 +6,14 @@ const GENERADOR = 'portal-documentos';
 const FONT = "Figtree, 'Segoe UI', system-ui, -apple-system, sans-serif";
 const FONTFACE = "@font-face{font-family:'Figtree';font-style:normal;font-weight:300 900;font-display:swap;src:url(data:font/ttf;base64," + FIGTREE_B64 + ") format('truetype')}";
 const TIPOS = {'.drawio': 'drawio', '.pdf': 'pdf', '.html': 'html', '.htm': 'html', '.docx': 'word', '.doc': 'word',
-  '.pptx': 'ppt', '.ppt': 'ppt', '.xlsx': 'excel', '.xlsm': 'excel', '.xls': 'excel'};
-const MIME = {'.drawio': 'application/xml', '.pdf': 'application/pdf', '.html': 'text/html', '.htm': 'text/html',
+  '.pptx': 'ppt', '.ppt': 'ppt', '.xlsx': 'excel', '.xlsm': 'excel', '.xls': 'excel', '.epub': 'epub'};
+const MIME = {'.epub': 'application/epub+zip', '.drawio': 'application/xml', '.pdf': 'application/pdf', '.html': 'text/html', '.htm': 'text/html',
   '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', '.doc': 'application/msword',
   '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation', '.ppt': 'application/vnd.ms-powerpoint',
   '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', '.xlsm': 'application/vnd.ms-excel.sheet.macroEnabled.12', '.xls': 'application/vnd.ms-excel'};
 const NOTA = {
   excel: 'Vista simplificada del Excel: valores, colores y celdas combinadas; no incluye formato condicional ni gráficos. Descarga el original para verlo completo.',
+  epub: 'Libro EPUB convertido a HTML: capítulos en orden, con índice e imágenes.',
   word: 'Vista del Word convertida a HTML: el formato puede variar. Descarga el original para verlo exacto.',
   ppt: 'Vista de la presentación convertida a HTML: textos, imágenes y tablas en su posición; el diseño puede variar. Descarga el original para verla exacta.'};
 const MAX_FILAS = 3000, MAX_COLS = 150;
@@ -148,6 +149,62 @@ function valorCelda(c, X) {
     return {txt: s, num: true};
   }
   return {txt: Number.isInteger(n) ? String(n) : String(+n.toPrecision(6)), num: true};
+}
+// ------------------------------------------------------------------ EPUB → HTML
+// Un EPUB es un ZIP con capítulos XHTML: se leen en el orden del libro (spine), con sus estilos e imágenes,
+// y se arma una sola página con índice. Las imágenes grandes se reducen.
+async function reducirImg(b, m) {
+  if (b.length < 150 * 1024 || !/^image\/(jpeg|png|gif|bmp|webp)$/.test(m)) return [b, m];
+  try { const bmp = await createImageBitmap(new Blob([b], {type: m})); const k = Math.min(1, 1400 / Math.max(bmp.width, bmp.height));
+    const cv = new OffscreenCanvas(Math.max(1, Math.round(bmp.width * k)), Math.max(1, Math.round(bmp.height * k))); cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
+    const o = await cv.convertToBlob({type: 'image/webp', quality: 0.8}); if (o.size < b.length * 0.9) return [new Uint8Array(await o.arrayBuffer()), 'image/webp']; } catch (e) {}
+  return [b, m];
+}
+async function epubAHtml(u8, titulo) {
+  const z = await abrirZip(u8);
+  const cont = await z.xml('META-INF/container.xml'); const rf = cont && [...cont.getElementsByTagName('*')].find(x => x.localName === 'rootfile');
+  const opfRuta = rf ? rf.getAttribute('full-path') : z.nombres.find(n => /\.opf$/i.test(n)); if (!opfRuta) throw new Error('EPUB sin índice (OPF)');
+  const opf = await z.xml(opfRuta), base = opfRuta.includes('/') ? opfRuta.slice(0, opfRuta.lastIndexOf('/')) : '';
+  const tod = n => [...opf.getElementsByTagName('*')].filter(x => x.localName === n);
+  const man = new Map(tod('item').map(it => [it.getAttribute('id'), {href: unir(base, decodeURIComponent(it.getAttribute('href') || '')), tipo: it.getAttribute('media-type') || ''}]));
+  const tituloLibro = (tod('title')[0] || {}).textContent || titulo, autor = (tod('creator')[0] || {}).textContent || '';
+  const orden = tod('itemref').map(r => man.get(r.getAttribute('idref'))).filter(x => x && /html/.test(x.tipo));
+  const datos = new Map(); const textos = []; let css = '', cuerpo = '', indice = '';
+  const recurso = async ruta => { if (datos.has(ruta)) return datos.get(ruta); let u = null;
+    if (z.tiene(ruta)) { const m = mimeImg(ruta) || (/\.(ttf|otf|woff2?)$/i.test(ruta) ? 'font/' + ext(ruta).slice(1) : null);
+      if (m) { let b = await z.bytes(ruta), mm = m; if (m.startsWith('image/')) [b, mm] = await reducirImg(b, m); u = 'data:' + mm + ';base64,' + b64(b); } }
+    datos.set(ruta, u); return u; };
+  const cssVisto = new Set();
+  const cssDe = async (t, dir) => { let o = t.replace(/@import[^;]+;/g, '');
+    for (const m of [...o.matchAll(/url\(\s*['"]?([^'")]+)['"]?\s*\)/g)]) { if (/^data:/.test(m[1])) continue; const u = await recurso(unir(dir, decodeURIComponent(m[1].split('#')[0]))); o = o.split(m[0]).join(u ? 'url(' + u + ')' : 'none'); }
+    return o.replace(/(^|[},])\s*(html|body)\b/g, '$1 .libro'); };
+  const id = new Map(orden.map((it, k) => [it.href, 'c' + k]));
+  for (let k = 0; k < orden.length; k++) {
+    const it = orden[k], t = await z.texto(it.href); if (!t) continue;
+    const d = new DOMParser().parseFromString(t, /\.x?html?$/i.test(it.href) && t.includes('xmlns') ? 'application/xhtml+xml' : 'text/html');
+    const dir = it.href.includes('/') ? it.href.slice(0, it.href.lastIndexOf('/')) : '';
+    for (const l of [...d.getElementsByTagName('link')]) { const h = l.getAttribute('href'); if (!h || !/stylesheet/i.test(l.getAttribute('rel') || '')) continue;
+      const r = unir(dir, decodeURIComponent(h)); if (cssVisto.has(r)) continue; cssVisto.add(r); const ct = await z.texto(r); if (ct) css += await cssDe(ct, r.includes('/') ? r.slice(0, r.lastIndexOf('/')) : ''); }
+    for (const st of [...d.getElementsByTagName('style')]) css += await cssDe(st.textContent, dir);
+    const body = d.getElementsByTagName('body')[0]; if (!body) continue;
+    for (const x of [...body.querySelectorAll('script,iframe,object,embed')]) x.remove();
+    for (const x of [...body.querySelectorAll('*')]) for (const a of [...x.attributes]) if (/^on/i.test(a.name)) x.removeAttribute(a.name);
+    for (const im of [...body.querySelectorAll('img,image')]) { const at = im.hasAttribute('src') ? 'src' : im.hasAttribute('href') ? 'href' : 'xlink:href'; const v = im.getAttribute(at) || im.getAttributeNS('http://www.w3.org/1999/xlink', 'href');
+      if (v && !/^data:/.test(v)) { const u = await recurso(unir(dir, decodeURIComponent(v))); if (u) { im.setAttribute(im.localName === 'img' ? 'src' : 'href', u); if (at === 'xlink:href') im.removeAttributeNS('http://www.w3.org/1999/xlink', 'href'); } } }
+    for (const a of [...body.querySelectorAll('a[href]')]) { const h = a.getAttribute('href'); if (/^(https?:|mailto:)/i.test(h)) { a.setAttribute('target', '_blank'); a.setAttribute('rel', 'noopener'); continue; }
+      const [f, frag] = h.split('#'); const dest = f ? id.get(unir(dir, decodeURIComponent(f))) : 'c' + k; a.setAttribute('href', '#' + (frag ? frag : dest || ''));
+      a.setAttribute('onclick', ''); a.removeAttribute('onclick'); }
+    const tit = (body.querySelector('h1,h2,h3') || {}).textContent; if (tit && tit.trim()) indice += '<li><a href="#c' + k + '">' + esc(tit.trim().slice(0, 120)) + '</a></li>';
+    textos.push(body.textContent.replace(/\s+/g, ' '));
+    cuerpo += '<section class="cap" id="c' + k + '">' + new XMLSerializer().serializeToString(body).replace(/^<body[^>]*>|<\/body>$/g, '').replace(/ xmlns(:\w+)?="[^"]*"/g, '') + '</section>';
+  }
+  if (!cuerpo) throw new Error('EPUB sin capítulos legibles');
+  const page = '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>' + esc(tituloLibro) + '</title><style>' +
+    'body{margin:0;background:#f2f2f2;padding:24px 12px}.libro{max-width:760px;margin:0 auto;background:#fff;padding:48px 56px;box-shadow:0 1px 6px #0002;font-family:Georgia,"Times New Roman",serif;font-size:17px;line-height:1.6;color:#222}' +
+    '.libro img,.libro svg{max-width:100%;height:auto}.cap{margin-bottom:48px;padding-bottom:24px;border-bottom:1px solid #eee}.portada h1{font-size:28px;margin:0 0 6px}.portada p{color:#666;margin:0 0 20px}.toc{font-size:15px}' +
+    css + '</style></head><body><div class="libro"><div class="portada"><h1>' + esc(tituloLibro) + '</h1>' + (autor ? '<p>' + esc(autor) + '</p>' : '') +
+    (indice ? '<nav class="toc"><ol>' + indice + '</ol></nav>' : '') + '</div>' + cuerpo + '</div></body></html>';
+  return {page, texto: textos.join(' ')};
 }
 async function xlsxAHtml(u8, titulo) {
   const X = await leerXlsx(u8); const textos = [], cortes = [], hojas = [];
@@ -660,6 +717,7 @@ async function construir(entradas, nombreCarpeta, opciones) {
           const x = ext(e.ruta); let R = null; const gem = gemelo.get(e);
           if (gem) { try { R = await PDFX.pdfAHtml(new Uint8Array(await gem.file.arrayBuffer()), d.titulo); m.nota = 'Vista del PDF «' + gem.ruta.split('/').pop() + '» (mismo nombre): fiel al original. «Descargar original» baja el ' + ({word: 'Word', excel: 'Excel', ppt: 'PowerPoint'}[tipo] || 'archivo') + '.'; }
             catch (er) { R = null; aviso(gem.ruta + ': no se pudo usar como vista (' + er.message + '); se convierte el original.'); } }
+          if (!R && x === '.epub') R = await epubAHtml(u8, d.titulo);
           if (R) {} else if (x === '.docx') R = await OX.docxAHtml(u8, d.titulo); else if (x === '.pptx') R = await OX.pptxAHtml(u8, d.titulo);
           if (R && R.avisos && R.avisos.emf) aviso(e.ruta + ': ' + R.avisos.emf + ' imagen(es) en formato EMF/WMF que el navegador no puede mostrar (se ven como recuadro gris).'); else if (x === '.xlsx' || x === '.xlsm') R = await xlsxAHtml(u8, d.titulo);
           // el original de Word/Excel/PowerPoint no se copia dentro del portal (lo haría muy pesado): «Descargar original»
@@ -702,6 +760,10 @@ async function elegirCarpeta() {
 function listo() {
   const n = ENTRADAS.filter(e => TIPOS[ext(e.ruta)] && !esConfig(e.ruta) && !esGenerador(e.ruta)).length;
   $('#carpeta').textContent = NOMBRE; $('#resumen').textContent = n + ' documento(s) encontrados en ' + ENTRADAS.length + ' archivo(s)';
+  // archivos que el portal no puede leer: se dicen por tipo para que se entienda por qué no aparecen
+  const otros = new Map(); for (const e of ENTRADAS) { const x = ext(e.ruta) || '(sin extensión)'; if (!TIPOS[x] && !esConfig(e.ruta) && !esGenerador(e.ruta) && !/^~\$/.test(e.ruta.split('/').pop())) otros.set(x, (otros.get(x) || 0) + 1); }
+  log('Listo: ' + n + ' documento(s) para el portal.' + (otros.size ? ' No se incluyen (formato no compatible): ' + [...otros].map(([x, c]) => c + ' ' + x).join(', ') + '.' : ''), otros.size ? 'av' : '');
+  if (!n) $('#estado').textContent = 'No hay documentos compatibles en esta carpeta (drawio, PDF, HTML, Word, Excel, PowerPoint o EPUB).';
   $('#titulo').value = NOMBRE; $('#bGenerar').disabled = !n; $('#bPlantilla').disabled = !n; $('#paso2').hidden = false; $('#paso1').classList.add('listo'); $('#paso2').classList.remove('listo');
   const cf = ENTRADAS.find(e => esConfig(e.ruta));
   if (cf) leerConfig(cf.file).then(c => { if (c.titulo) $('#titulo').value = c.titulo; $('#resumen').textContent += ' · configuración: ' + cf.ruta; }).catch(() => {});

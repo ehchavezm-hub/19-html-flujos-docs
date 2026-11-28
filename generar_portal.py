@@ -370,7 +370,7 @@ PLANTILLA = r'''<!doctype html>
 :root{--tinta:#2E2E2E;--tinta2:#555555;--mut:#6D6E71;--linea:#D6D6D6;--linea2:#E0E0E0;--fondo:#F2F2F2;--papel:#fff;
 --side:#1A1A1A;--azul:#003087;--azul2:#005A9C;--azul-suave:#E6EEF7;--side-ink:#F2F2F2;--side-mut:#9A9B9D;
 --acc:#FF6600;--acc-btn:#CC4400;--acc-txt:#CC4400;--acc-suave:#FFF0E6;--ok:#1E6B3A;--ok-suave:#E3F1E8;--pend:#A33A00;--pend-suave:#FFE7D6;--r:4px;
---drawio:#0078C1;--pdf:#CC4400;--html:#005A9C;--word:#003087;--excel:#1E6B3A;--ppt:#E85500;--pendiente:#FF8833;--error:#8F1D1D}
+--drawio:#0078C1;--pdf:#CC4400;--html:#005A9C;--word:#003087;--excel:#1E6B3A;--ppt:#E85500;--epub:#5A9FD4;--pendiente:#FF8833;--error:#8F1D1D}
 *{box-sizing:border-box}[hidden]{display:none!important}html,body{height:100%;margin:0}
 body{font-family:__FONT__;color:var(--tinta);background:var(--fondo);display:grid;grid-template-columns:var(--menu-w,292px) 1fr;overflow:hidden;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
 :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
@@ -492,14 +492,14 @@ __PAYLOAD__
 const META=JSON.parse(document.getElementById('meta').textContent);
 const byId=Object.fromEntries(META.map(m=>[m.id,m]));
 const $=s=>document.querySelector(s), main=$('#main'), nav=$('#nav');
-const NOM={drawio:'Diagrama',pdf:'PDF',html:'HTML',word:'Word',excel:'Excel',ppt:'PowerPoint',pendiente:'Pendiente',error:'Error'};
-const OK={drawio:1,pdf:1,html:1,word:1,excel:1,ppt:1};
+const NOM={drawio:'Diagrama',pdf:'PDF',html:'HTML',word:'Word',excel:'Excel',ppt:'PowerPoint',epub:'Libro',pendiente:'Pendiente',error:'Error'};
+const OK={drawio:1,pdf:1,html:1,word:1,excel:1,ppt:1,epub:1};
 const norm=s=>(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
 const e=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const disp=META.filter(m=>m.tipo in OK).length;
 const npend=META.filter(m=>m.tipo==='pendiente').length;
 $('#foot').innerHTML='<span><b>'+disp+'</b> disponibles</span>'+(npend?'<span><b>'+npend+'</b> pendientes</span>':'');
-const COL={drawio:'var(--drawio)',pdf:'var(--pdf)',html:'var(--html)',word:'var(--word)',excel:'var(--excel)',ppt:'var(--ppt)',pendiente:'var(--pendiente)',error:'var(--error)'};
+const COL={drawio:'var(--drawio)',pdf:'var(--pdf)',html:'var(--html)',word:'var(--word)',excel:'var(--excel)',ppt:'var(--ppt)',epub:'var(--epub)',pendiente:'var(--pendiente)',error:'var(--error)'};
 const tag=m=>'<span class="tg" style="--c:'+COL[m.tipo]+'">'+NOM[m.tipo]+'</span>';
 const est=m=>m.estado&&!(m.tipo==='pendiente'&&/^pendiente$/i.test(m.estado))?'<span class="est'+(m.tipo==='pendiente'?' p':'')+'">'+e(m.estado)+'</span>':'';
 const blobs={};
@@ -660,6 +660,9 @@ function sombra(host,html){
   d.querySelectorAll('script').forEach(x=>x.remove());
   const r=host.shadowRoot||host.attachShadow({mode:'open'});
   r.innerHTML='<style>:host{display:block}.vhtml{min-height:100%}.vbody{min-height:100%}'+css+'</style><div class="vhtml" id="vz"><div class="vbody">'+d.body.innerHTML+'</div></div>';
+  // enlaces internos de la vista (índices de libros y documentos): se mueven dentro de la vista, no cambian de documento
+  if(!r.__enl){r.__enl=1;r.addEventListener('click',ev=>{const a=ev.target.closest&&ev.target.closest('a[href^="#"]');if(!a)return;ev.preventDefault();ev.stopPropagation();
+    const id=decodeURIComponent(a.getAttribute('href').slice(1));const t=id&&(r.getElementById(id)||r.querySelector('[name="'+CSS.escape(id)+'"]'));if(t)t.scrollIntoView({block:'start',behavior:'smooth'})})}
   // pestañas de hojas de Excel
   const tabs=r.querySelectorAll('.tabs button');
   tabs.forEach(b=>b.onclick=()=>{tabs.forEach(x=>x.removeAttribute('aria-selected'));b.setAttribute('aria-selected','true');r.querySelectorAll('.h').forEach((h,i)=>h.hidden=i!=+b.dataset.h)});
